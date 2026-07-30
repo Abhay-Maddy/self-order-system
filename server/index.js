@@ -51,6 +51,7 @@ app.use('/api/settings', settingRoutes);
 
 // Serve static frontend build from dist folder
 const distPath = path.join(__dirname, '../dist');
+const distIndexPath = path.join(distPath, 'index.html');
 app.use(express.static(distPath));
 
 // Fallback all non-API routes to index.html (Fixes "Cannot GET /")
@@ -58,7 +59,13 @@ app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
     return next();
   }
-  res.sendFile(path.join(distPath, 'index.html'));
+  import('fs').then(fs => {
+    if (fs.existsSync(distIndexPath)) {
+      res.sendFile(distIndexPath);
+    } else {
+      res.status(200).json({ message: 'GourmetBites API Server is running. Frontend served separately via Vercel.' });
+    }
+  });
 });
 
 // Socket.io Connection & Room Logic
