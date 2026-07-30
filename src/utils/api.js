@@ -17,7 +17,14 @@ export const fetchAPI = async (endpoint, options = {}) => {
     headers,
   });
 
-  const data = await response.json();
+  const contentType = response.headers.get('content-type');
+  let data;
+  if (contentType && contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    throw new Error(`Backend server unreachable or VITE_API_URL not set (${response.status})`);
+  }
+
   if (!response.ok) {
     throw new Error(data.error || 'API Request failed');
   }
