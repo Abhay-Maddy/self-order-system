@@ -13,6 +13,12 @@ import couponRoutes from './routes/couponRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import settingRoutes from './routes/settingRoutes.js';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -37,6 +43,18 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
+
+// Serve static frontend build from dist folder
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
+
+// Fallback all non-API routes to index.html (Fixes "Cannot GET /")
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+    return next();
+  }
+  res.sendFile(path.join(distPath, 'index.html'));
+});
 
 // Socket.io Connection & Room Logic
 io.on('connection', (socket) => {
