@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
-    "start": "node server/index.js",
+    "start": "node start.js",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "postinstall": "npm rebuild sqlite3 --build-from-source"
   },
