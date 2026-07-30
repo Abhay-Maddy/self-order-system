@@ -9,14 +9,14 @@ router.get('/', async (req, res) => {
   try {
     const settings = await getQuery('SELECT * FROM restaurant_settings LIMIT 1');
     res.json(settings || {
-      name: 'GourmetBites Bistro',
+      name: 'Amantradha Bistro',
       address: '123 Spice Avenue, Culinary District, Mumbai - 400001',
       phone: '+91 98765 43210',
       gstin: '27AAAAA0000A1Z5',
       tax_rate: 5.0,
       currency: '₹',
       default_lang: 'en',
-      google_maps_review_url: 'https://maps.google.com/?q=GourmetBites+Bistro'
+      google_maps_review_url: 'https://maps.google.com/?q=Amantradha+Bistro'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

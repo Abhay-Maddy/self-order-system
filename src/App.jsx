@@ -25,14 +25,8 @@ export function App() {
                 {activePanel === 'admin' && <AdminPanel />}
               </main>
 
-              <footer style={{
-                textAlign: 'center',
-                padding: '1.25rem 0',
-                borderTop: '1px solid var(--border-color)',
-                fontSize: '0.85rem',
-                color: 'var(--text-muted)'
-              }}>
-                GourmetBites QR Self-Ordering Platform • Powered by Antigravity AI
+              <footer style={{ textAlign: 'center', padding: '1rem', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Amantradha QR Self-Ordering Platform • Powered by Antigravity AI
               </footer>
             </div>
           </SocketProvider>

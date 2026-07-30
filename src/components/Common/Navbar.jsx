@@ -32,7 +32,7 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
             <Utensils size={22} />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.25rem', lineHeight: '1.1' }}>GourmetBites</h2>
+            <h2 style={{ fontSize: '1.25rem', lineHeight: '1.1' }}>Amantradha</h2>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>Self-Ordering Platform</span>
           </div>
         </div>

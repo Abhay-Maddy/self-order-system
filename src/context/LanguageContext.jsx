@@ -4,7 +4,7 @@ export const LanguageContext = createContext();
 
 const translations = {
   en: {
-    welcome: 'Welcome to GourmetBites',
+    welcome: 'Welcome to Amantradha',
     menu: 'Menu',
     cart: 'Your Cart',
     checkout: 'Checkout',

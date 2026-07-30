@@ -76,7 +76,7 @@ export const StaffApprovalManager = () => {
             Main Admin Governance & User Accounts
           </h2>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Main Admin Email: <b>admin@gourmetbites.com</b> • Manage Admins, Chefs & Cashiers
+            Main Admin Email: <b>admin@amantradha.com</b> • Manage Admins, Chefs & Cashiers
           </span>
         </div>
 
@@ -107,7 +107,7 @@ export const StaffApprovalManager = () => {
 
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Email Address</label>
-              <input type="email" required value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} className="input-field" placeholder="user@gourmetbites.com" />
+              <input type="email" required value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} className="input-field" placeholder="user@amantradha.com" />
             </div>
 
             <div>

@@ -63,7 +63,7 @@ app.get('*', (req, res, next) => {
     if (fs.existsSync(distIndexPath)) {
       res.sendFile(distIndexPath);
     } else {
-      res.status(200).json({ message: 'GourmetBites API Server is running. Frontend served separately via Vercel.' });
+      res.status(200).json({ message: 'Amantradha API Server is running. Frontend served separately via Vercel.' });
     }
   });
 });
@@ -88,7 +88,7 @@ const PORT = process.env.PORT || 5000;
 initDb()
   .then(() => {
     server.listen(PORT, () => {
-      console.log(`🚀 GourmetBites Express & Socket.io server running on http://localhost:${PORT}`);
+      console.log(`🚀 Amantradha Express & Socket.io server running on http://localhost:${PORT}`);
     });
   })
   .catch((err) => {

@@ -35,7 +35,7 @@ export const CheckoutModal = ({
   // Generate dynamic UPI QR Code URL when amount or option changes
   useEffect(() => {
     if (isOpen && grandTotal > 0) {
-      const upiString = `upi://pay?pa=gourmetbites@upi&pn=GourmetBites%20Restaurant&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}%20Order`;
+      const upiString = `upi://pay?pa=amantradha@upi&pn=Amantradha%20Restaurant&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}%20Order`;
       QRCode.toDataURL(upiString, { width: 200, margin: 2, color: { dark: '#0f172a', light: '#ffffff' } })
         .then(url => setQrDataUrl(url))
         .catch(err => console.error('Failed to generate UPI QR:', err));

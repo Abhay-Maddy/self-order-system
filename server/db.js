@@ -230,14 +230,14 @@ export const initDb = async () => {
   await runQuery(`
     CREATE TABLE IF NOT EXISTS restaurant_settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT DEFAULT 'GourmetBites Bistro',
+      name TEXT DEFAULT 'Amantradha Bistro',
       address TEXT DEFAULT '123 Spice Avenue, Culinary District, Mumbai - 400001',
       phone TEXT DEFAULT '+91 98765 43210',
       gstin TEXT DEFAULT '27AAAAA0000A1Z5',
       tax_rate REAL DEFAULT 5.0,
       currency TEXT DEFAULT '₹',
       default_lang TEXT DEFAULT 'en',
-      google_maps_review_url TEXT DEFAULT 'https://maps.google.com/?q=GourmetBites+Bistro'
+      google_maps_review_url TEXT DEFAULT 'https://maps.google.com/?q=Amantradha+Bistro'
     )
   `);
 
@@ -251,20 +251,20 @@ export const initDb = async () => {
 
     // Users
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'admin', 'admin@gourmetbites.com', adminPass, 'Main Admin Owner', 'admin', 1, 'approved'
+      'admin', 'admin@amantradha.com', adminPass, 'Main Admin Owner', 'admin', 1, 'approved'
     ]);
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'chef1', 'chef1@gourmetbites.com', chefPass, 'Head Chef Mario', 'chef', 0, 'approved'
+      'chef1', 'chef1@amantradha.com', chefPass, 'Head Chef Mario', 'chef', 0, 'approved'
     ]);
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'chef2', 'chef2@gourmetbites.com', chefPass, 'Junior Chef Alex', 'chef', 0, 'pending'
+      'chef2', 'chef2@amantradha.com', chefPass, 'Junior Chef Alex', 'chef', 0, 'pending'
     ]);
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'cashier1', 'cashier1@gourmetbites.com', cashierPass, 'Front Cashier Sarah', 'cashier', 0, 'approved'
+      'cashier1', 'cashier1@amantradha.com', cashierPass, 'Front Cashier Sarah', 'cashier', 0, 'approved'
     ]);
 
     // Restaurant Settings
-    await runQuery(`INSERT INTO restaurant_settings (name) VALUES ('GourmetBites Bistro')`);
+    await runQuery(`INSERT INTO restaurant_settings (name) VALUES ('Amantradha Bistro')`);
 
     // Tables
     const tables = [
@@ -397,7 +397,7 @@ export const initDb = async () => {
     console.log('Seeding completed successfully!');
   } else {
     // Ensure main admin user has email and is_main_admin = 1 in existing database
-    await runQuery(`UPDATE users SET email = 'admin@gourmetbites.com', is_main_admin = 1 WHERE username = 'admin' AND (email IS NULL OR email = '')`);
+    await runQuery(`UPDATE users SET email = 'admin@amantradha.com', is_main_admin = 1 WHERE username = 'admin' AND (email IS NULL OR email = '' OR email LIKE '%gourmetbites%')`);
   }
 };
 

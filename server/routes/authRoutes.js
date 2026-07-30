@@ -58,7 +58,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email || `${user.username}@gourmetbites.com`,
+        email: user.email || `${user.username}@amantradha.com`,
         name: user.name,
         role: user.role,
         is_main_admin: user.is_main_admin || 0,
@@ -102,7 +102,7 @@ router.post('/add-user', verifyToken, requireRole(['admin']), async (req, res) =
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const userEmail = email || `${username}@gourmetbites.com`;
+    const userEmail = email || `${username}@amantradha.com`;
     const isMainAdmin = 0; // Only initial admin is main admin by default
 
     await runQuery(

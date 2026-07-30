@@ -51,7 +51,7 @@ router.get('/invoice/:orderId', verifyToken, requireRole(['admin', 'cashier']), 
       order,
       items,
       settings: settings || {
-        name: 'GourmetBites Bistro',
+        name: 'Amantradha Bistro',
         address: '123 Spice Avenue, Culinary District, Mumbai - 400001',
         phone: '+91 98765 43210',
         gstin: '27AAAAA0000A1Z5',

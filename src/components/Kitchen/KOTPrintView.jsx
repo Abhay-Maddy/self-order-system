@@ -47,7 +47,7 @@ export const KOTPrintView = ({ order, isOpen, onClose }) => {
           </div>
 
           <div style={{ textAlign: 'center', fontSize: '0.8rem' }}>
-            Printed via GourmetBites KDS System
+            Printed via Amantradha KDS System
           </div>
         </div>
 

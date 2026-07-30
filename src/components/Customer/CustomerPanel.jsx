@@ -8,12 +8,13 @@ import { CheckoutModal } from './CheckoutModal';
 import { OrderTracker } from './OrderTracker';
 import { GoogleReviewModal } from './GoogleReviewModal';
 import { OrderHistoryModal } from './OrderHistoryModal';
-import { BottomCartBar } from './BottomCartBar';
+import { AmantradhaSplash } from './AmantradhaSplash';
 import { fetchAPI } from '../../utils/api';
 import { SocketContext } from '../../context/SocketContext';
 
 export const CustomerPanel = () => {
   const { socket, joinRoom } = useContext(SocketContext);
+  const [showSplash, setShowSplash] = useState(true);
 
   const [categories, setCategories] = useState([]);
   const [allItems, setAllItems] = useState([]);
@@ -130,6 +131,12 @@ export const CustomerPanel = () => {
 
   return (
     <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
+      {showSplash && (
+        <AmantradhaSplash
+          tableNumber={selectedTable}
+          onComplete={() => setShowSplash(false)}
+        />
+      )}
       <TableSessionHeader
         selectedTable={selectedTable}
         setSelectedTable={setSelectedTable}

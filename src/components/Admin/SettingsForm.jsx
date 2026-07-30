@@ -4,14 +4,13 @@ import { Settings, Save } from 'lucide-react';
 
 export const SettingsForm = () => {
   const [formData, setFormData] = useState({
-    name: 'GourmetBites Bistro',
-    address: '123 Spice Avenue, Culinary District, Mumbai - 400001',
-    phone: '+91 98765 43210',
-    gstin: '27AAAAA0000A1Z5',
-    tax_rate: 5.0,
-    currency: '₹',
-    default_lang: 'en',
-    google_maps_review_url: 'https://maps.google.com/?q=GourmetBites+Bistro'
+    name: 'Amantradha Bistro',
+    address: '123 Gourmet Avenue, Foodville',
+    phone: '+91 9876543210',
+    email: 'contact@amantradha.com',
+    currency: 'INR',
+    tax_rate: 5,
+    google_maps_review_url: 'https://maps.google.com/?q=Amantradha+Bistro'
   });
   const [savedMessage, setSavedMessage] = useState('');
 
