@@ -8,8 +8,9 @@ export const SocketProvider = ({ children }) => {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    // In production / Vite proxy environment, socket connects to window.location.origin or fallback
-    const newSocket = io(window.location.origin, {
+    // Connect to VITE_API_URL (Render backend) or fallback to window.location.origin
+    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
     });
