@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://gourmetbites-backend.onrender.com/api/:path*"
+      "destination": "https://self-order-system-b5hs.onrender.com/api/:path*"
     },
     {
       "source": "/socket.io/:path*",
-      "destination": "https://gourmetbites-backend.onrender.com/socket.io/:path*"
+      "destination": "https://self-order-system-b5hs.onrender.com/socket.io/:path*"
     }
   ]
 }
