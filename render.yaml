@@ -2,7 +2,7 @@ services:
   - type: web
     name: gourmetbites-backend
     env: node
-    buildCommand: npm install
+    buildCommand: npm install && npm rebuild sqlite3 --build-from-source
     startCommand: node server/index.js
     envVars:
       - key: PORT
