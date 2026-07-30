@@ -1,0 +1,404 @@
+import sqlite3 from 'sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dbPath = path.join(__dirname, 'restaurant.db');
+
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening SQLite database:', err);
+  } else {
+    console.log('Connected to SQLite database at:', dbPath);
+  }
+});
+
+// Helper to run query with Promises
+export const runQuery = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) reject(err);
+      else resolve(this);
+    });
+  });
+};
+
+export const getQuery = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+};
+
+export const allQuery = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+};
+
+// Initialize schema and seed data
+export const initDb = async () => {
+  // Create Tables
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT CHECK(role IN ('admin', 'cashier', 'chef')) NOT NULL,
+      is_main_admin INTEGER DEFAULT 0,
+      status TEXT CHECK(status IN ('pending', 'approved', 'rejected', 'deactivated')) DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  try {
+    await runQuery(`ALTER TABLE users ADD COLUMN email TEXT`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE users ADD COLUMN is_main_admin INTEGER DEFAULT 0`);
+  } catch (e) {}
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      sort_order INTEGER DEFAULT 0
+    )
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS subcategories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+    )
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS menu_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      subcategory_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      subtitle TEXT DEFAULT '',
+      tags TEXT DEFAULT '',
+      description TEXT,
+      price REAL NOT NULL,
+      is_veg INTEGER DEFAULT 1,
+      is_vegan INTEGER DEFAULT 0,
+      is_gluten_free INTEGER DEFAULT 0,
+      spice_level TEXT DEFAULT 'medium',
+      image_url TEXT,
+      stock_quantity INTEGER DEFAULT 50,
+      low_stock_threshold INTEGER DEFAULT 5,
+      is_active INTEGER DEFAULT 1,
+      FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Safely add subtitle/tags columns if missing in existing DB
+  try {
+    await runQuery(`ALTER TABLE menu_items ADD COLUMN subtitle TEXT DEFAULT ''`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE menu_items ADD COLUMN tags TEXT DEFAULT ''`);
+  } catch (e) {}
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS item_variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      price_modifier REAL NOT NULL DEFAULT 0,
+      FOREIGN KEY (item_id) REFERENCES menu_items(id) ON DELETE CASCADE
+    )
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS tables (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      table_number TEXT UNIQUE NOT NULL,
+      capacity INTEGER DEFAULT 4,
+      location_zone TEXT DEFAULT 'Main Hall',
+      is_active INTEGER DEFAULT 1
+    )
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS coupons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      discount_type TEXT CHECK(discount_type IN ('percentage', 'fixed')) NOT NULL,
+      discount_value REAL NOT NULL,
+      min_order_amount REAL DEFAULT 0,
+      max_discount REAL DEFAULT 0,
+      usage_limit INTEGER DEFAULT 100,
+      times_used INTEGER DEFAULT 0,
+      expires_at TEXT,
+      is_active INTEGER DEFAULT 1
+    )
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_number TEXT UNIQUE NOT NULL,
+      table_number TEXT NOT NULL,
+      customer_phone TEXT,
+      payment_mode TEXT CHECK(payment_mode IN ('online', 'cash')) NOT NULL,
+      payment_status TEXT CHECK(payment_status IN ('pending', 'completed', 'failed', 'refunded')) DEFAULT 'pending',
+      total_amount REAL NOT NULL,
+      tax_amount REAL NOT NULL,
+      discount_amount REAL DEFAULT 0,
+      net_amount REAL NOT NULL,
+      status TEXT DEFAULT 'active',
+      order_source TEXT CHECK(order_source IN ('customer', 'waiter')) DEFAULT 'customer',
+      scheduled_time TEXT DEFAULT 'ASAP (~15 mins)',
+      refund_reason TEXT,
+      prep_time_minutes INTEGER DEFAULT 15,
+      estimated_ready_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN order_source TEXT CHECK(order_source IN ('customer', 'waiter')) DEFAULT 'customer'`);
+  } catch (e) {}
+
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN scheduled_time TEXT DEFAULT 'ASAP (~15 mins)'`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN prep_time_minutes INTEGER DEFAULT 15`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN estimated_ready_at DATETIME`);
+  } catch (e) {}
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      item_name TEXT NOT NULL,
+      variant_name TEXT,
+      toppings_summary TEXT,
+      spice_level TEXT,
+      quantity INTEGER NOT NULL,
+      unit_price REAL NOT NULL,
+      total_price REAL NOT NULL,
+      fulfillment_type TEXT CHECK(fulfillment_type IN ('dine_in', 'packing')) NOT NULL DEFAULT 'dine_in',
+      status TEXT CHECK(status IN ('pending', 'accepted', 'preparing', 'ready', 'served', 'rejected')) DEFAULT 'pending',
+      rejection_reason TEXT,
+      prep_time_minutes INTEGER DEFAULT 15,
+      estimated_ready_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    )
+  `);
+
+  try {
+    await runQuery(`ALTER TABLE order_items ADD COLUMN prep_time_minutes INTEGER DEFAULT 15`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE order_items ADD COLUMN estimated_ready_at DATETIME`);
+  } catch (e) {}
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      rating INTEGER CHECK(rating BETWEEN 1 AND 5),
+      comment TEXT,
+      redirected_to_google INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id)
+    )
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS restaurant_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT DEFAULT 'GourmetBites Bistro',
+      address TEXT DEFAULT '123 Spice Avenue, Culinary District, Mumbai - 400001',
+      phone TEXT DEFAULT '+91 98765 43210',
+      gstin TEXT DEFAULT '27AAAAA0000A1Z5',
+      tax_rate REAL DEFAULT 5.0,
+      currency TEXT DEFAULT '₹',
+      default_lang TEXT DEFAULT 'en',
+      google_maps_review_url TEXT DEFAULT 'https://maps.google.com/?q=GourmetBites+Bistro'
+    )
+  `);
+
+  // Seed default data if empty
+  const userCount = await getQuery('SELECT COUNT(*) as count FROM users');
+  if (userCount.count === 0) {
+    console.log('Seeding initial data...');
+    const adminPass = await bcrypt.hash('admin123', 10);
+    const chefPass = await bcrypt.hash('chef123', 10);
+    const cashierPass = await bcrypt.hash('cashier123', 10);
+
+    // Users
+    await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+      'admin', 'admin@gourmetbites.com', adminPass, 'Main Admin Owner', 'admin', 1, 'approved'
+    ]);
+    await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+      'chef1', 'chef1@gourmetbites.com', chefPass, 'Head Chef Mario', 'chef', 0, 'approved'
+    ]);
+    await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+      'chef2', 'chef2@gourmetbites.com', chefPass, 'Junior Chef Alex', 'chef', 0, 'pending'
+    ]);
+    await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+      'cashier1', 'cashier1@gourmetbites.com', cashierPass, 'Front Cashier Sarah', 'cashier', 0, 'approved'
+    ]);
+
+    // Restaurant Settings
+    await runQuery(`INSERT INTO restaurant_settings (name) VALUES ('GourmetBites Bistro')`);
+
+    // Tables
+    const tables = [
+      { num: 'T-01', cap: 2, zone: 'Window Section' },
+      { num: 'T-02', cap: 4, zone: 'Main Dining' },
+      { num: 'T-03', cap: 4, zone: 'Main Dining' },
+      { num: 'T-04', cap: 6, zone: 'Family Booth' },
+      { num: 'T-05', cap: 2, zone: 'Patio Outdoor' }
+    ];
+    for (const t of tables) {
+      await runQuery(`INSERT INTO tables (table_number, capacity, location_zone) VALUES (?, ?, ?)`, [t.num, t.cap, t.zone]);
+    }
+
+    // Coupons
+    await runQuery(`INSERT INTO coupons (code, discount_type, discount_value, min_order_amount, max_discount, usage_limit) VALUES (?, ?, ?, ?, ?, ?)`, [
+      'WELCOME10', 'percentage', 10, 200, 100, 50
+    ]);
+    await runQuery(`INSERT INTO coupons (code, discount_type, discount_value, min_order_amount, max_discount, usage_limit) VALUES (?, ?, ?, ?, ?, ?)`, [
+      'FLAT50', 'fixed', 50, 400, 50, 30
+    ]);
+
+    // Categories & Subcategories
+    const cat1 = await runQuery(`INSERT INTO categories (name, description, sort_order) VALUES (?, ?, ?)`, ['Starters & Appetizers', 'Delicious small bites to kickstart your meal', 1]);
+    const cat2 = await runQuery(`INSERT INTO categories (name, description, sort_order) VALUES (?, ?, ?)`, ['Main Course', 'Hearty chef-special curries, bowls & breads', 2]);
+    const cat3 = await runQuery(`INSERT INTO categories (name, description, sort_order) VALUES (?, ?, ?)`, ['Beverages', 'Refreshing mocks, shakes & cold brews', 3]);
+    const cat4 = await runQuery(`INSERT INTO categories (name, description, sort_order) VALUES (?, ?, ?)`, ['Desserts', 'Sweet treats and classic desserts', 4]);
+
+    const sub1 = await runQuery(`INSERT INTO subcategories (category_id, name, sort_order) VALUES (?, ?, ?)`, [cat1.lastID, 'Momos & Dimsums', 1]);
+    const sub2 = await runQuery(`INSERT INTO subcategories (category_id, name, sort_order) VALUES (?, ?, ?)`, [cat1.lastID, 'Crispy Snacks', 2]);
+    const sub3 = await runQuery(`INSERT INTO subcategories (category_id, name, sort_order) VALUES (?, ?, ?)`, [cat2.lastID, 'Signature Curries', 1]);
+    const sub4 = await runQuery(`INSERT INTO subcategories (category_id, name, sort_order) VALUES (?, ?, ?)`, [cat2.lastID, 'Biryanis & Bowls', 2]);
+    const sub5 = await runQuery(`INSERT INTO subcategories (category_id, name, sort_order) VALUES (?, ?, ?)`, [cat3.lastID, 'Craft Shakes', 1]);
+    const sub6 = await runQuery(`INSERT INTO subcategories (category_id, name, sort_order) VALUES (?, ?, ?)`, [cat4.lastID, 'Ice Creams & Sweets', 1]);
+
+    // Menu Items
+    const items = [
+      {
+        sub: sub1.lastID,
+        name: 'Steamed Paneer Tikka Momos (8 Pcs)',
+        desc: 'Handcrafted momos stuffed with spiced cottage cheese and green herbs, served with spicy garlic dip.',
+        price: 180,
+        veg: 1, vgn: 0, gf: 0, spice: 'medium',
+        img: 'https://images.unsplash.com/photo-1625220194771-7ebdea0b70b9?w=600&auto=format&fit=crop&q=80',
+        stock: 35, threshold: 5,
+        variants: [{ name: 'Half (4 Pcs)', mod: -80 }, { name: 'Full (8 Pcs)', mod: 0 }]
+      },
+      {
+        sub: sub1.lastID,
+        name: 'Crispy Fried Chicken Momos',
+        desc: 'Crunchy golden fried chicken momos sprinkled with peri peri seasoning.',
+        price: 220,
+        veg: 0, vgn: 0, gf: 0, spice: 'hot',
+        img: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=600&auto=format&fit=crop&q=80',
+        stock: 20, threshold: 5,
+        variants: [{ name: 'Half (4 Pcs)', mod: -100 }, { name: 'Full (8 Pcs)', mod: 0 }]
+      },
+      {
+        sub: sub2.lastID,
+        name: 'Truffle Parmesan French Fries',
+        desc: 'Double-fried potato batons tossed in white truffle oil and fresh parmesan.',
+        price: 190,
+        veg: 1, vgn: 0, gf: 1, spice: 'mild',
+        img: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600&auto=format&fit=crop&q=80',
+        stock: 40, threshold: 8,
+        variants: [{ name: 'Regular', mod: 0 }, { name: 'Large Cheese Burst', mod: 50 }]
+      },
+      {
+        sub: sub3.lastID,
+        name: 'Velvety Butter Chicken Gravy',
+        desc: 'Tender tandoori chicken simmered in rich tomato, butter, and cashew cream sauce.',
+        price: 340,
+        veg: 0, vgn: 0, gf: 1, spice: 'medium',
+        img: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=600&auto=format&fit=crop&q=80',
+        stock: 15, threshold: 3,
+        variants: [{ name: 'Single Portion', mod: 0 }, { name: 'Family Handi', mod: 200 }]
+      },
+      {
+        sub: sub3.lastID,
+        name: 'Shahi Paneer Cream Masala',
+        desc: 'Cottage cheese cubes cooked in aromatic royal spices and silky cream.',
+        price: 290,
+        veg: 1, vgn: 0, gf: 1, spice: 'mild',
+        img: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=600&auto=format&fit=crop&q=80',
+        stock: 25, threshold: 4,
+        variants: [{ name: 'Single Portion', mod: 0 }, { name: 'Family Handi', mod: 170 }]
+      },
+      {
+        sub: sub4.lastID,
+        name: 'Hyderabadi Dum Chicken Biryani',
+        desc: 'Fragrant basmati rice layered with marinated chicken, saffron, and caramelised onions.',
+        price: 360,
+        veg: 0, vgn: 0, gf: 1, spice: 'hot',
+        img: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80',
+        stock: 2, threshold: 5, // Low stock on purpose to trigger warning
+        variants: [{ name: 'Regular', mod: 0 }, { name: 'Jumbo Pack', mod: 250 }]
+      },
+      {
+        sub: sub5.lastID,
+        name: 'Belgian Dark Chocolate Thick Shake',
+        desc: 'Rich 70% dark Belgian chocolate blended with creamy ice cream.',
+        price: 170,
+        veg: 1, vgn: 0, gf: 1, spice: 'mild',
+        img: 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=600&auto=format&fit=crop&q=80',
+        stock: 50, threshold: 10,
+        variants: [{ name: 'Standard (350ml)', mod: 0 }, { name: 'Monster Jar (500ml)', mod: 50 }]
+      },
+      {
+        sub: sub6.lastID,
+        name: 'Warm Chocolate Lava Cake',
+        desc: 'Gooey dark chocolate center cake served with a scoop of vanilla bean gelato.',
+        price: 195,
+        veg: 1, vgn: 0, gf: 0, spice: 'mild',
+        img: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&auto=format&fit=crop&q=80',
+        stock: 12, threshold: 4,
+        variants: [{ name: 'Single Slice', mod: 0 }]
+      }
+    ];
+
+    for (const item of items) {
+      const res = await runQuery(`
+        INSERT INTO menu_items (subcategory_id, name, description, price, is_veg, is_vegan, is_gluten_free, spice_level, image_url, stock_quantity, low_stock_threshold)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [item.sub, item.name, item.desc, item.price, item.veg, item.vgn, item.gf, item.spice, item.img, item.stock, item.threshold]);
+      
+      const itemId = res.lastID;
+      for (const v of item.variants) {
+        await runQuery(`INSERT INTO item_variants (item_id, name, price_modifier) VALUES (?, ?, ?)`, [itemId, v.name, v.mod]);
+      }
+    }
+    console.log('Seeding completed successfully!');
+  } else {
+    // Ensure main admin user has email and is_main_admin = 1 in existing database
+    await runQuery(`UPDATE users SET email = 'admin@gourmetbites.com', is_main_admin = 1 WHERE username = 'admin' AND (email IS NULL OR email = '')`);
+  }
+};
+
+export default db;
