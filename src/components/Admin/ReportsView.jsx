@@ -13,7 +13,7 @@ export const ReportsView = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `amantradha_sales_report_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `aamantran_sales_report_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();

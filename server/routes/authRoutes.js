@@ -58,7 +58,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email || `${user.username}@amantradha.com`,
+        email: user.email || `${user.username}@aamantran.com`,
         name: user.name,
         role: user.role,
         is_main_admin: user.is_main_admin || 0,
@@ -102,7 +102,7 @@ router.post('/add-user', verifyToken, requireRole(['admin']), async (req, res) =
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const userEmail = email || `${username}@amantradha.com`;
+    const userEmail = email || `${username}@aamantran.com`;
     const isMainAdmin = 0; // Only initial admin is main admin by default
 
     await runQuery(
@@ -134,21 +134,81 @@ router.delete('/users/:id', verifyToken, requireRole(['admin']), async (req, res
   }
 });
 
-// Admin: Approve/Reject/Deactivate staff user
-router.patch('/staff/:id/status', verifyToken, requireRole(['admin']), async (req, res) => {
+// User: Update own profile (Name, Email, Username, Password)
+router.put('/profile', verifyToken, async (req, res) => {
   try {
-    const { status } = req.body;
-    if (!['approved', 'rejected', 'deactivated', 'pending'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status.' });
+    const { name, email, username, password } = req.body;
+    const userId = req.user.id;
+
+    if (!name || !username) {
+      return res.status(400).json({ error: 'Name and Username are required.' });
     }
 
-    const targetUser = await getQuery('SELECT * FROM users WHERE id = ?', [req.params.id]);
-    if (targetUser && targetUser.is_main_admin === 1) {
-      return res.status(403).json({ error: 'Cannot modify status of the Main Admin account.' });
+    // Check if username is taken by another user
+    const existing = await getQuery('SELECT id FROM users WHERE username = ? AND id != ?', [username, userId]);
+    if (existing) {
+      return res.status(400).json({ error: 'Username is already taken by another account.' });
     }
 
-    await runQuery('UPDATE users SET status = ? WHERE id = ?', [status, req.params.id]);
-    res.json({ message: `User status updated to ${status}` });
+    let passwordHash = req.user.password_hash;
+    if (password && password.trim()) {
+      passwordHash = await bcrypt.hash(password.trim(), 10);
+    }
+
+    await runQuery(
+      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ? WHERE id = ?`,
+      [name, email, username, passwordHash, userId]
+    );
+
+    const updatedUser = await getQuery('SELECT id, username, email, name, role, is_main_admin, status FROM users WHERE id = ?', [userId]);
+    const newToken = generateToken(updatedUser);
+
+    res.json({
+      message: 'Profile updated successfully!',
+      token: newToken,
+      user: updatedUser
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Edit any staff member's profile (Name, Email, Username, Role, Status, Password reset)
+router.put('/staff/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, email, username, role, status, password } = req.body;
+    const targetId = req.params.id;
+
+    const targetUser = await getQuery('SELECT * FROM users WHERE id = ?', [targetId]);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (!name || !username) {
+      return res.status(400).json({ error: 'Name and Username are required.' });
+    }
+
+    // Check username uniqueness
+    const existing = await getQuery('SELECT id FROM users WHERE username = ? AND id != ?', [username, targetId]);
+    if (existing) {
+      return res.status(400).json({ error: 'Username is already taken.' });
+    }
+
+    let passwordHash = targetUser.password_hash;
+    if (password && password.trim()) {
+      passwordHash = await bcrypt.hash(password.trim(), 10);
+    }
+
+    // Don't downgrade main admin role or status
+    const newRole = targetUser.is_main_admin === 1 ? 'admin' : (role || targetUser.role);
+    const newStatus = targetUser.is_main_admin === 1 ? 'approved' : (status || targetUser.status);
+
+    await runQuery(
+      `UPDATE users SET name = ?, email = ?, username = ?, role = ?, status = ?, password_hash = ? WHERE id = ?`,
+      [name, email, username, newRole, newStatus, passwordHash, targetId]
+    );
+
+    res.json({ message: `Staff account '${username}' updated successfully!` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

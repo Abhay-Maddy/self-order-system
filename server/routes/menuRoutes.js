@@ -86,6 +86,28 @@ router.post('/subcategories', verifyToken, requireRole(['admin']), async (req, r
   }
 });
 
+router.put('/subcategories/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, sort_order, category_id } = req.body;
+    await runQuery(
+      'UPDATE subcategories SET name = ?, sort_order = ?, category_id = ? WHERE id = ?',
+      [name, sort_order || 0, category_id, req.params.id]
+    );
+    res.json({ message: 'Subcategory updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/subcategories/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    await runQuery('DELETE FROM subcategories WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Subcategory deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin: CRUD Menu Items
 router.post('/items', verifyToken, requireRole(['admin']), async (req, res) => {
   try {

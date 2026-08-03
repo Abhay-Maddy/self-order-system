@@ -30,13 +30,13 @@ export const DashboardOverview = () => {
 
         <div className="glass-card" style={{ padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Orders</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Today Daily Orders</span>
             <div style={{ background: 'var(--info-bg)', color: 'var(--info)', padding: '0.4rem', borderRadius: '8px' }}>
               <ShoppingBag size={20} />
             </div>
           </div>
-          <h2 style={{ fontSize: '1.75rem' }}>{stats.totalOrders}</h2>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{stats.activeOrders} Currently Active</span>
+          <h2 style={{ fontSize: '1.75rem', color: 'var(--brand-primary)' }}>{stats.todayOrders || 0}</h2>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{stats.activeOrders} Currently Active • {stats.totalOrders} Lifetime</span>
         </div>
 
         <div className="glass-card" style={{ padding: '1.25rem' }}>

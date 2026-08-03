@@ -4,13 +4,13 @@ import { Settings, Save } from 'lucide-react';
 
 export const SettingsForm = () => {
   const [formData, setFormData] = useState({
-    name: 'Amantradha Bistro',
+    name: 'Aamantran Bistro',
     address: '123 Gourmet Avenue, Foodville',
     phone: '+91 9876543210',
-    email: 'contact@amantradha.com',
+    email: 'contact@aamantran.com',
     currency: 'INR',
     tax_rate: 5,
-    google_maps_review_url: 'https://maps.google.com/?q=Amantradha+Bistro'
+    google_maps_review_url: 'https://maps.google.com/?q=Aamantran+Bistro'
   });
   const [savedMessage, setSavedMessage] = useState('');
 

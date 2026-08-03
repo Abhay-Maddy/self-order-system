@@ -7,7 +7,9 @@ const router = express.Router();
 // Admin: Analytics Summary (Revenue, order count, avg prep time, top seller)
 router.get('/analytics', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
   try {
-    const totalRevRow = await getQuery("SELECT SUM(net_amount) as total FROM orders WHERE payment_status = 'completed' OR status = 'completed'");
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const totalRevRow = await getQuery("SELECT SUM(net_amount) as total FROM orders WHERE DATE(created_at) = ?", [todayStr]);
+    const todayOrdersRow = await getQuery("SELECT COUNT(*) as total FROM orders WHERE DATE(created_at) = ?", [todayStr]);
     const totalOrdersRow = await getQuery("SELECT COUNT(*) as total FROM orders");
     const activeOrdersRow = await getQuery("SELECT COUNT(*) as total FROM orders WHERE status = 'active'");
     
@@ -21,11 +23,12 @@ router.get('/analytics', verifyToken, requireRole(['admin', 'cashier']), async (
       LIMIT 1
     `);
 
-    // Average prep time calculation (mock calculated or based on item status changes)
+    // Average prep time calculation
     const reviewsAvg = await getQuery("SELECT AVG(rating) as avg_rating, COUNT(*) as review_count FROM reviews");
 
     res.json({
       todayRevenue: totalRevRow ? totalRevRow.total || 0 : 0,
+      todayOrders: todayOrdersRow ? todayOrdersRow.total : 0,
       totalOrders: totalOrdersRow ? totalOrdersRow.total : 0,
       activeOrders: activeOrdersRow ? activeOrdersRow.total : 0,
       avgPrepMinutes: 14,
@@ -51,7 +54,7 @@ router.get('/invoice/:orderId', verifyToken, requireRole(['admin', 'cashier']), 
       order,
       items,
       settings: settings || {
-        name: 'Amantradha Bistro',
+        name: 'Aamantran Bistro',
         address: '123 Spice Avenue, Culinary District, Mumbai - 400001',
         phone: '+91 98765 43210',
         gstin: '27AAAAA0000A1Z5',

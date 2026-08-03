@@ -26,7 +26,7 @@ export function App() {
               </main>
 
               <footer style={{ textAlign: 'center', padding: '1rem', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Amantradha QR Self-Ordering Platform • Powered by Antigravity AI
+                Aamantran QR Self-Ordering Platform • Powered by Antigravity AI
               </footer>
             </div>
           </SocketProvider>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Modal } from '../Common/Modal';
 import { formatCurrency } from '../../utils/formatters';
+import { fetchAPI } from '../../utils/api';
 import { LanguageContext } from '../../context/LanguageContext';
 import { CreditCard, Banknote, Phone, CheckCircle, ShieldCheck, QrCode, Smartphone, Sparkles, Check, AlertCircle } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -32,19 +33,36 @@ export const CheckoutModal = ({
   const taxAmount = (netBeforeTax * 0.05);
   const grandTotal = netBeforeTax + taxAmount;
 
+  const [merchantUpiId, setMerchantUpiId] = useState('aamantran@upi');
+  const [merchantName, setMerchantName] = useState('Aamantran Restaurant');
+
+  useEffect(() => {
+    fetchAPI('/settings')
+      .then(s => {
+        if (s.payment_upi_id) setMerchantUpiId(s.payment_upi_id);
+        if (s.payment_merchant_name) setMerchantName(s.payment_merchant_name);
+      })
+      .catch(err => console.error(err));
+  }, []);
+
   // Generate dynamic UPI QR Code URL when amount or option changes
   useEffect(() => {
     if (isOpen && grandTotal > 0) {
-      const upiString = `upi://pay?pa=amantradha@upi&pn=Amantradha%20Restaurant&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}%20Order`;
+      const upiString = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}%20Order`;
       QRCode.toDataURL(upiString, { width: 200, margin: 2, color: { dark: '#0f172a', light: '#ffffff' } })
         .then(url => setQrDataUrl(url))
         .catch(err => console.error('Failed to generate UPI QR:', err));
     }
-  }, [isOpen, grandTotal, tableNumber]);
+  }, [isOpen, grandTotal, tableNumber, merchantUpiId, merchantName]);
 
   if (!isOpen) return null;
 
   const handleConfirmOrder = async () => {
+    if (!customerPhone || !customerPhone.trim() || customerPhone.trim().length < 10) {
+      setErrorMessage('Mobile Phone Number is COMPULSORY (*)! Please enter a valid 10-digit mobile number before placing your order.');
+      return;
+    }
+
     if (paymentMode === 'online' && onlineOption === 'upi_id' && !upiIdInput.trim()) {
       setErrorMessage('Please enter a valid UPI ID (e.g. mobile@upi).');
       return;
@@ -107,12 +125,13 @@ export const CheckoutModal = ({
 
           <div>
             <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.4rem', fontSize: '0.8rem' }}>
-              📱 Mobile (Optional):
+              📱 Mobile Number <span style={{ color: 'var(--danger)', fontWeight: 800 }}>*</span> (Compulsory):
             </label>
             <div style={{ position: 'relative' }}>
               <Phone size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type="tel"
+                required
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="+91 9876543210"

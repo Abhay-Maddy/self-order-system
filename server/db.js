@@ -2,6 +2,9 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -230,14 +233,14 @@ export const initDb = async () => {
   await runQuery(`
     CREATE TABLE IF NOT EXISTS restaurant_settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT DEFAULT 'Amantradha Bistro',
+      name TEXT DEFAULT 'Aamantran Bistro',
       address TEXT DEFAULT '123 Spice Avenue, Culinary District, Mumbai - 400001',
       phone TEXT DEFAULT '+91 98765 43210',
       gstin TEXT DEFAULT '27AAAAA0000A1Z5',
       tax_rate REAL DEFAULT 5.0,
       currency TEXT DEFAULT '₹',
       default_lang TEXT DEFAULT 'en',
-      google_maps_review_url TEXT DEFAULT 'https://maps.google.com/?q=Amantradha+Bistro'
+      google_maps_review_url TEXT DEFAULT 'https://maps.google.com/?q=Aamantran+Bistro'
     )
   `);
 
@@ -251,20 +254,20 @@ export const initDb = async () => {
 
     // Users
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'admin', 'admin@amantradha.com', adminPass, 'Main Admin Owner', 'admin', 1, 'approved'
+      'admin', 'admin@aamantran.com', adminPass, 'Main Admin Owner', 'admin', 1, 'approved'
     ]);
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'chef1', 'chef1@amantradha.com', chefPass, 'Head Chef Mario', 'chef', 0, 'approved'
+      'chef1', 'chef1@aamantran.com', chefPass, 'Head Chef Mario', 'chef', 0, 'approved'
     ]);
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'chef2', 'chef2@amantradha.com', chefPass, 'Junior Chef Alex', 'chef', 0, 'pending'
+      'chef2', 'chef2@aamantran.com', chefPass, 'Junior Chef Alex', 'chef', 0, 'pending'
     ]);
     await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
-      'cashier1', 'cashier1@amantradha.com', cashierPass, 'Front Cashier Sarah', 'cashier', 0, 'approved'
+      'cashier1', 'cashier1@aamantran.com', cashierPass, 'Front Cashier Sarah', 'cashier', 0, 'approved'
     ]);
 
     // Restaurant Settings
-    await runQuery(`INSERT INTO restaurant_settings (name) VALUES ('Amantradha Bistro')`);
+    await runQuery(`INSERT INTO restaurant_settings (name) VALUES ('Aamantran Bistro')`);
 
     // Tables
     const tables = [
@@ -395,9 +398,31 @@ export const initDb = async () => {
       }
     }
     console.log('Seeding completed successfully!');
-  } else {
-    // Ensure main admin user has email and is_main_admin = 1 in existing database
-    await runQuery(`UPDATE users SET email = 'admin@amantradha.com', is_main_admin = 1 WHERE username = 'admin' AND (email IS NULL OR email = '' OR email LIKE '%gourmetbites%')`);
+  }
+
+  // Always sync Main Admin credentials from .env if provided
+  const envAdminUsername = process.env.ADMIN_USERNAME || 'admin';
+  const envAdminEmail = process.env.ADMIN_EMAIL || 'admin@aamantran.com';
+  const envAdminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+
+  try {
+    const hashedAdminPass = await bcrypt.hash(envAdminPassword, 10);
+    const existingMainAdmin = await getQuery('SELECT id FROM users WHERE is_main_admin = 1 OR username = ?', [envAdminUsername]);
+    if (existingMainAdmin) {
+      await runQuery(
+        `UPDATE users SET username = ?, email = ?, password_hash = ?, is_main_admin = 1, status = 'approved' WHERE id = ?`,
+        [envAdminUsername, envAdminEmail, hashedAdminPass, existingMainAdmin.id]
+      );
+      console.log(`✅ Main Admin credentials synced from .env (Email: ${envAdminEmail}, Username: ${envAdminUsername})`);
+    } else {
+      await runQuery(
+        `INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Main Admin Owner', 'admin', 1, 'approved')`,
+        [envAdminUsername, envAdminEmail, hashedAdminPass]
+      );
+      console.log(`✅ Created Main Admin account from .env (Email: ${envAdminEmail})`);
+    }
+  } catch (err) {
+    console.error('Error syncing Main Admin credentials from .env:', err.message);
   }
 };
 

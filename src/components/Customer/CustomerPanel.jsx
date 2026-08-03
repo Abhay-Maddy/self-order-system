@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { TableSessionHeader } from './TableSessionHeader';
 import { CategoryTabs } from './CategoryTabs';
 import { MenuGrid } from './MenuGrid';
@@ -8,7 +8,8 @@ import { CheckoutModal } from './CheckoutModal';
 import { OrderTracker } from './OrderTracker';
 import { GoogleReviewModal } from './GoogleReviewModal';
 import { OrderHistoryModal } from './OrderHistoryModal';
-import { AmantradhaSplash } from './AmantradhaSplash';
+import { AamantranSplash } from './AamantranSplash';
+import { BottomCartBar } from './BottomCartBar';
 import { fetchAPI } from '../../utils/api';
 import { SocketContext } from '../../context/SocketContext';
 
@@ -37,13 +38,27 @@ export const CustomerPanel = () => {
   const [isOrderTrackerOpen, setIsOrderTrackerOpen] = useState(false);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [tamperAlert, setTamperAlert] = useState(false);
 
-  // Parse query param table e.g. ?table=T-04
+  // Parse query param table with anti-tamper session security
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tableParam = params.get('table');
     if (tableParam) {
-      setSelectedTable(tableParam.toUpperCase());
+      const cleanTable = tableParam.toUpperCase();
+      const storedScannedTable = sessionStorage.getItem('scanned_table_qr');
+
+      if (!storedScannedTable) {
+        // Initial physical QR scan -> lock table session
+        sessionStorage.setItem('scanned_table_qr', cleanTable);
+        setSelectedTable(cleanTable);
+      } else if (storedScannedTable !== cleanTable) {
+        // URL tampering detected! Revert to original scanned table
+        setTamperAlert(true);
+        setSelectedTable(storedScannedTable);
+      } else {
+        setSelectedTable(cleanTable);
+      }
     }
   }, []);
 
@@ -129,13 +144,36 @@ export const CustomerPanel = () => {
     return createdOrder;
   };
 
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+  }, []);
+
   return (
     <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
       {showSplash && (
-        <AmantradhaSplash
+        <AamantranSplash
           tableNumber={selectedTable}
-          onComplete={() => setShowSplash(false)}
+          onComplete={handleSplashComplete}
         />
+      )}
+
+      {tamperAlert && (
+        <div style={{
+          background: 'var(--danger-bg)',
+          color: 'var(--danger)',
+          border: '1px solid var(--danger)',
+          padding: '0.85rem 1.25rem',
+          borderRadius: '10px',
+          marginBottom: '1rem',
+          fontWeight: 700,
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <span>🔒 <b>Security Alert:</b> Manual URL table tampering blocked! Your session remains locked to your physical scanned <b>Table #{selectedTable}</b>.</span>
+        </div>
       )}
       <TableSessionHeader
         selectedTable={selectedTable}

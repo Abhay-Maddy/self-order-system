@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: gourmetbites-backend
+    name: aamantran-backend
     env: node
     buildCommand: npm install && npm run build && npm rebuild sqlite3 --build-from-source
     startCommand: node start.js

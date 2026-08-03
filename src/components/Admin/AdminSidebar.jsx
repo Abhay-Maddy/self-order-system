@@ -1,13 +1,15 @@
 import React from 'react';
-import { LayoutDashboard, Utensils, QrCode, Users, Package, Tag, FileText, Settings, CreditCard, RotateCcw } from 'lucide-react';
+import { LayoutDashboard, Utensils, QrCode, Users, Package, Tag, FileText, Settings, CreditCard, RotateCcw, ShoppingBag, Star } from 'lucide-react';
 
 export const AdminSidebar = ({ activeTab, setActiveTab, role }) => {
   const navItems = [
     { id: 'overview', label: 'Overview & Stats', icon: LayoutDashboard, roles: ['admin', 'cashier'] },
+    { id: 'live_orders', label: 'Live Orders & Progress', icon: ShoppingBag, roles: ['admin', 'cashier'] },
     { id: 'billing', label: 'Invoices & Billing', icon: CreditCard, roles: ['admin', 'cashier'] },
     { id: 'refunds', label: 'Refund Processing', icon: RotateCcw, roles: ['admin', 'cashier'] },
     { id: 'customers', label: 'Customer Database', icon: Users, roles: ['admin', 'cashier'] },
     { id: 'menu', label: 'Menu Catalog Manager', icon: Utensils, roles: ['admin'] },
+    { id: 'item_reviews', label: 'Item Reviews & Ratings', icon: Star, roles: ['admin'] },
     { id: 'tables', label: 'Table & QR Manager', icon: QrCode, roles: ['admin'] },
     { id: 'staff', label: 'Staff Approvals', icon: Users, roles: ['admin'] },
     { id: 'inventory', label: 'Stock & Inventory', icon: Package, roles: ['admin', 'cashier'] },

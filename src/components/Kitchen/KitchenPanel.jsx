@@ -71,7 +71,7 @@ export const KitchenPanel = () => {
     if (!socket) return;
 
     const handleNewOrder = (newOrder) => {
-      playKitchenChime();
+      playKitchenChime(newOrder?.table_number);
       loadActiveOrders();
     };
 

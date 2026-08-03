@@ -8,16 +8,18 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const settings = await getQuery('SELECT * FROM restaurant_settings LIMIT 1');
-    res.json(settings || {
-      name: 'Amantradha Bistro',
-      address: '123 Spice Avenue, Culinary District, Mumbai - 400001',
-      phone: '+91 98765 43210',
-      gstin: '27AAAAA0000A1Z5',
-      tax_rate: 5.0,
-      currency: '₹',
-      default_lang: 'en',
-      google_maps_review_url: 'https://maps.google.com/?q=Amantradha+Bistro'
-    });
+    const defaultSettings = {
+      name: process.env.PAYMENT_MERCHANT_NAME || 'Aamantran Bistro',
+      address: settings.address || '',
+      phone: settings.phone || '',
+      gstin: settings.gstin || '',
+      tax_rate: settings.tax_rate || 5,
+      currency: settings.currency || '₹',
+      payment_upi_id: process.env.PAYMENT_UPI_ID || 'aamantran@upi',
+      payment_merchant_name: process.env.PAYMENT_MERCHANT_NAME || 'Aamantran Restaurant',
+      google_maps_review_url: 'https://maps.google.com/?q=Aamantran+Bistro'
+    };
+    res.json({ ...defaultSettings, ...(settings || {}) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

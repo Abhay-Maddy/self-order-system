@@ -39,7 +39,7 @@ export const GoogleReviewModal = ({ isOpen, onClose, orderId, googleReviewUrl })
     if (comment) {
       navigator.clipboard?.writeText(comment);
     }
-    window.open(googleReviewUrl || 'https://maps.google.com/?q=GourmetBites+Bistro', '_blank');
+    window.open(googleReviewUrl || 'https://maps.google.com/?q=Aamantran+Bistro', '_blank');
   };
 
   return (
@@ -95,7 +95,7 @@ export const GoogleReviewModal = ({ isOpen, onClose, orderId, googleReviewUrl })
           {rating >= 4 && (
             <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-surface-elevated)', marginBottom: '1rem' }}>
               <p style={{ fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.95rem' }}>
-                🌟 Help others discover Amantradha!
+                🌟 Help others discover Aamantran!
               </p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                 Would you mind sharing your 5-star review on our Google Maps profile?
