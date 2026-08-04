@@ -127,8 +127,8 @@ export const AamantranSplash = ({ tableNumber, onComplete }) => {
         Fine Dining & Self-Ordering
       </p>
 
-      {/* Table Welcome Chip */}
-      {tableNumber && (
+      {/* Table Welcome Chip: ONLY shown when URL contains physical QR table param */}
+      {tableNumber && Boolean(new URLSearchParams(window.location.search).get('table')) && (
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.08)',

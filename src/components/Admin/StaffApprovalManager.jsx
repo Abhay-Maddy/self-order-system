@@ -160,9 +160,10 @@ export const StaffApprovalManager = () => {
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Role</label>
               <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="input-field">
-                <option value="admin">Admin (Sub-Admin)</option>
-                <option value="chef">Chef / Kitchen Staff</option>
-                <option value="cashier">Cashier / Waiter</option>
+                <option value="chef">Kitchen / Chef</option>
+                <option value="cashier">Waiter / Floor Staff</option>
+                <option value="admin">Owner / Admin</option>
+                <option value="cashier">Billing / Cashier</option>
               </select>
             </div>
 
@@ -197,9 +198,9 @@ export const StaffApprovalManager = () => {
               <div>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Role:</label>
                 <select value={editFormData.role} onChange={e => setEditFormData({ ...editFormData, role: e.target.value })} className="input-field" disabled={editingUser.is_main_admin === 1}>
-                  <option value="admin">Admin</option>
-                  <option value="chef">Chef / Kitchen Staff</option>
-                  <option value="cashier">Cashier / Waiter</option>
+                  <option value="chef">Kitchen / Chef</option>
+                  <option value="cashier">Waiter / Floor Staff</option>
+                  <option value="admin">Owner / Admin</option>
                 </select>
               </div>
 

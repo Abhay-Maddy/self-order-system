@@ -9,12 +9,19 @@ router.get('/', async (req, res) => {
   try {
     const categories = await allQuery('SELECT * FROM categories ORDER BY sort_order ASC, id ASC');
     const subcategories = await allQuery('SELECT * FROM subcategories ORDER BY sort_order ASC, id ASC');
-    const items = await allQuery('SELECT * FROM menu_items ORDER BY id ASC');
+    const items = await allQuery('SELECT * FROM menu_items ORDER BY sort_order ASC, id ASC');
     const variants = await allQuery('SELECT * FROM item_variants');
 
-    // Attach variants to items
+    // Create lookup table from subcategory_id -> category_id
+    const subcatToCatMap = {};
+    subcategories.forEach(sub => {
+      subcatToCatMap[sub.id] = sub.category_id;
+    });
+
+    // Attach category_id and variants to items
     const itemsWithVariants = items.map(item => ({
       ...item,
+      category_id: subcatToCatMap[item.subcategory_id] || item.subcategory_id,
       variants: variants.filter(v => v.item_id === item.id)
     }));
 
@@ -166,6 +173,28 @@ router.delete('/items/:id', verifyToken, requireRole(['admin']), async (req, res
   try {
     await runQuery('DELETE FROM menu_items WHERE id = ?', [req.params.id]);
     res.json({ message: 'Item deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Reorder — update sort_order for a category
+router.patch('/categories/:id/sort', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { sort_order } = req.body;
+    await runQuery('UPDATE categories SET sort_order = ? WHERE id = ?', [sort_order, req.params.id]);
+    res.json({ message: 'Category sort order updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Reorder — update sort_order for a menu item
+router.patch('/items/:id/sort', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { sort_order } = req.body;
+    await runQuery('UPDATE menu_items SET sort_order = ? WHERE id = ?', [sort_order, req.params.id]);
+    res.json({ message: 'Item sort order updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

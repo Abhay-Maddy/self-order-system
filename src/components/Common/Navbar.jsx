@@ -4,10 +4,12 @@ import { LangToggle } from './LangToggle';
 import { UserProfileModal } from './UserProfileModal';
 import { StaffLoginModal } from './StaffLoginModal';
 import { AuthContext } from '../../context/AuthContext';
-import { Utensils, ChefHat, LayoutDashboard, LogOut, Settings, LogIn, Lock } from 'lucide-react';
+import { LanguageContext } from '../../context/LanguageContext';
+import { Utensils, ChefHat, LayoutDashboard, LogOut, Settings, Lock } from 'lucide-react';
 
 export const Navbar = ({ activePanel, setActivePanel }) => {
   const { user, logout } = useContext(AuthContext);
+  const { t } = useContext(LanguageContext);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isStaffLoginOpen, setIsStaffLoginOpen] = useState(false);
 
@@ -47,13 +49,13 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
         {/* Panel Switcher Nav - Only shown when staff is logged in */}
         {user ? (
           <nav style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-surface-elevated)', padding: '0.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-            <button
+              <button
               onClick={() => setActivePanel('customer')}
               className={`btn btn-sm ${activePanel === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ border: 'none', fontSize: '0.85rem' }}
             >
               <Utensils size={14} />
-              <span>Customer Menu</span>
+              <span>{t('customerMenu')}</span>
             </button>
 
             {/* Kitchen Pass: Available for Chef, Cashier/Waiter, and Admin */}
@@ -63,7 +65,7 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
               style={{ border: 'none', fontSize: '0.85rem' }}
             >
               <ChefHat size={14} />
-              <span>Kitchen Pass</span>
+              <span>{t('kitchenPass')}</span>
             </button>
 
             {/* Admin Portal: Strictly restricted to Admin role ONLY */}
@@ -74,7 +76,7 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
                 style={{ border: 'none', fontSize: '0.85rem' }}
               >
                 <LayoutDashboard size={14} />
-                <span>Admin Portal</span>
+                <span>{t('adminPortal')}</span>
               </button>
             )}
           </nav>
@@ -82,16 +84,16 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
 
         {/* Right Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          {/* Staff Login Button: Placed on the LEFT side of <LangToggle /> when no table param is in URL */}
+          {/* Staff Login Button: Hidden when customer accesses via QR code scan */}
           {!user && !hasTableParam && (
             <button
-              onClick={() => setIsStaffLoginOpen(true)}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.8rem', fontWeight: 700, gap: '0.35rem', borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
+              onClick={() => setActivePanel('staff-login')}
+              className={`btn btn-sm ${activePanel === 'staff-login' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ fontSize: '0.8rem', fontWeight: 700, gap: '0.35rem', borderColor: 'var(--brand-primary)', color: activePanel === 'staff-login' ? '#fff' : 'var(--brand-primary)' }}
               title="Staff & Admin Portal Sign In"
             >
               <Lock size={13} />
-              <span>Staff Login</span>
+              <span>{t('staffLogin')}</span>
             </button>
           )}
 
@@ -107,7 +109,7 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
                 style={{ fontSize: '0.8rem', fontWeight: 600, gap: '0.3rem' }}
               >
                 <Settings size={13} />
-                <span>{user.name} ({user.role})</span>
+                <span>{user.name}</span>
               </button>
               <button onClick={logout} className="btn btn-secondary btn-sm" title="Log Out">
                 <LogOut size={14} />
@@ -125,7 +127,7 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
       <StaffLoginModal
         isOpen={isStaffLoginOpen}
         onClose={() => setIsStaffLoginOpen(false)}
-        setActivePanel={setActivePanel}
+        onLoginSuccess={(targetPanel) => setActivePanel(targetPanel)}
       />
     </header>
   );

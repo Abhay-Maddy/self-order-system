@@ -110,12 +110,14 @@ export const initDb = async () => {
     )
   `);
 
-  // Safely add subtitle/tags columns if missing in existing DB
   try {
     await runQuery(`ALTER TABLE menu_items ADD COLUMN subtitle TEXT DEFAULT ''`);
   } catch (e) {}
   try {
     await runQuery(`ALTER TABLE menu_items ADD COLUMN tags TEXT DEFAULT ''`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE menu_items ADD COLUMN sort_order INTEGER DEFAULT 0`);
   } catch (e) {}
 
   await runQuery(`
@@ -420,6 +422,15 @@ export const initDb = async () => {
         [envAdminUsername, envAdminEmail, hashedAdminPass]
       );
       console.log(`✅ Created Main Admin account from .env (Email: ${envAdminEmail})`);
+    }
+
+    // Ensure cashier1 demo user exists
+    const existingCashier = await getQuery("SELECT id FROM users WHERE username = 'cashier1'");
+    if (!existingCashier) {
+      const cashierPass = await bcrypt.hash('cashier123', 10);
+      await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Front Cashier Sarah', 'cashier', 0, 'approved')`, [
+        'cashier1', 'cashier1@aamantran.com', cashierPass
+      ]);
     }
   } catch (err) {
     console.error('Error syncing Main Admin credentials from .env:', err.message);

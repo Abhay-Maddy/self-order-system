@@ -10,17 +10,33 @@ import { GoogleReviewModal } from './GoogleReviewModal';
 import { OrderHistoryModal } from './OrderHistoryModal';
 import { AamantranSplash } from './AamantranSplash';
 import { BottomCartBar } from './BottomCartBar';
+import { WelcomeLanding } from './WelcomeLanding';
+import { PageSkeleton } from '../Common/PageSkeleton';
 import { fetchAPI } from '../../utils/api';
 import { SocketContext } from '../../context/SocketContext';
+import { AuthContext } from '../../context/AuthContext';
 
 export const CustomerPanel = () => {
   const { socket, joinRoom } = useContext(SocketContext);
-  const [showSplash, setShowSplash] = useState(true);
+  const { user } = useContext(AuthContext);
+  // Show splash ONLY ONCE per session on first load
+  const [showSplash, setShowSplash] = useState(() => {
+    return !sessionStorage.getItem('aamantran_splash_shown');
+  });
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
+
+  const handleSplashComplete = () => {
+    sessionStorage.setItem('aamantran_splash_shown', 'true');
+    setShowSplash(false);
+  };
 
   const [categories, setCategories] = useState([]);
   const [allItems, setAllItems] = useState([]);
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState('T-01');
+
+  // Check if table parameter is present in URL
+  const hasTableParam = Boolean(new URLSearchParams(window.location.search).get('table'));
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeSubcat, setActiveSubcat] = useState('all');
@@ -64,12 +80,14 @@ export const CustomerPanel = () => {
 
   // Fetch Menu and Tables
   useEffect(() => {
+    setIsLoadingMenu(true);
     fetchAPI('/menu')
       .then(data => {
         setCategories(data.categories || []);
         setAllItems(data.allItems || []);
       })
-      .catch(err => console.error('Menu load error:', err));
+      .catch(err => console.error('Menu load error:', err))
+      .finally(() => setIsLoadingMenu(false));
 
     fetchAPI('/tables')
       .then(data => setTables(data || []))
@@ -114,13 +132,20 @@ export const CustomerPanel = () => {
       if (!matchName && !matchDesc) return false;
     }
     if (activeCategory !== 'all') {
-      const catObj = categories.find(c => c.id === activeCategory);
-      if (catObj && catObj.subcategories) {
-        const subcatIds = catObj.subcategories.map(s => s.id);
+      const catObj = categories.find(c => String(c.id) === String(activeCategory));
+      if (catObj) {
+        const subcatIds = (catObj.subcategories || []).map(s => String(s.id));
+        const matchesCategory = String(item.category_id) === String(activeCategory);
+        const matchesSubcategory = subcatIds.includes(String(item.subcategory_id));
+        
         if (activeSubcat !== 'all') {
-          if (item.subcategory_id !== activeSubcat) return false;
+          if (String(item.subcategory_id) !== String(activeSubcat)) return false;
         } else {
-          if (!subcatIds.includes(item.subcategory_id)) return false;
+          if (!matchesCategory && !matchesSubcategory) return false;
+        }
+      } else {
+        if (String(item.subcategory_id) !== String(activeCategory) && String(item.category_id) !== String(activeCategory)) {
+          return false;
         }
       }
     }
@@ -144,12 +169,8 @@ export const CustomerPanel = () => {
     return createdOrder;
   };
 
-  const handleSplashComplete = useCallback(() => {
-    setShowSplash(false);
-  }, []);
-
   return (
-    <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
+    <div>
       {showSplash && (
         <AamantranSplash
           tableNumber={selectedTable}
@@ -157,57 +178,75 @@ export const CustomerPanel = () => {
         />
       )}
 
-      {tamperAlert && (
-        <div style={{
-          background: 'var(--danger-bg)',
-          color: 'var(--danger)',
-          border: '1px solid var(--danger)',
-          padding: '0.85rem 1.25rem',
-          borderRadius: '10px',
-          marginBottom: '1rem',
-          fontWeight: 700,
-          fontSize: '0.85rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          boxShadow: 'var(--shadow-sm)'
-        }}>
-          <span>🔒 <b>Security Alert:</b> Manual URL table tampering blocked! Your session remains locked to your physical scanned <b>Table #{selectedTable}</b>.</span>
-        </div>
+      {/* Render Welcome Landing Hero Page ONLY for generic non-logged in visitors without QR table param */}
+      {!hasTableParam && !user && (
+        <WelcomeLanding
+          onStartOrdering={() => {
+            const menuSection = document.getElementById('menu-catalog-section');
+            if (menuSection) menuSection.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
       )}
-      <TableSessionHeader
-        selectedTable={selectedTable}
-        setSelectedTable={setSelectedTable}
-        tables={tables}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        vegOnly={vegOnly}
-        setVegOnly={setVegOnly}
-        cartItemCount={cart.reduce((sum, i) => sum + i.quantity, 0)}
-        onOpenCart={() => setIsCartOpen(true)}
-        activeOrder={activeOrder}
-        onOpenOrderTracker={() => setIsOrderTrackerOpen(true)}
-        onOpenHistory={() => setIsHistoryOpen(true)}
-      />
 
-      <CategoryTabs
-        categories={categories}
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
-        activeSubcat={activeSubcat}
-        setActiveSubcat={setActiveSubcat}
-      />
+      <div id="menu-catalog-section" className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
+        {tamperAlert && (
+          <div style={{
+            background: 'var(--danger-bg)',
+            color: 'var(--danger)',
+            border: '1px solid var(--danger)',
+            padding: '0.85rem 1.25rem',
+            borderRadius: '10px',
+            marginBottom: '1rem',
+            fontWeight: 700,
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <span>🔒 <b>Security Alert:</b> Manual URL table tampering blocked! Your session remains locked to your physical scanned <b>Table #{selectedTable}</b>.</span>
+          </div>
+        )}
 
-      <MenuGrid
-        items={filteredItems}
-        onSelectItem={(item) => setSelectedItemForModal(item)}
-      />
+        <TableSessionHeader
+          selectedTable={selectedTable}
+          setSelectedTable={setSelectedTable}
+          tables={tables}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          vegOnly={vegOnly}
+          setVegOnly={setVegOnly}
+          cartItemCount={cart.reduce((sum, i) => sum + i.quantity, 0)}
+          onOpenCart={() => setIsCartOpen(true)}
+          activeOrder={activeOrder}
+          onOpenOrderTracker={() => setIsOrderTrackerOpen(true)}
+          onOpenHistory={() => setIsHistoryOpen(true)}
+        />
 
-      {/* Floating Bottom Pop-Up Cart Bar */}
-      <BottomCartBar
-        cart={cart}
-        onOpenCart={() => setIsCartOpen(true)}
-      />
+        {isLoadingMenu ? (
+          <PageSkeleton title="Loading Digital Menu..." />
+        ) : (
+          <>
+            <CategoryTabs
+              categories={categories}
+              activeCategory={activeCategory}
+              setActiveCategory={setActiveCategory}
+              activeSubcat={activeSubcat}
+              setActiveSubcat={setActiveSubcat}
+            />
+
+            <MenuGrid
+              items={filteredItems}
+              onSelectItem={(item) => setSelectedItemForModal(item)}
+            />
+          </>
+        )}
+
+        {/* Floating Bottom Pop-Up Cart Bar */}
+        <BottomCartBar
+          cart={cart}
+          onOpenCart={() => setIsCartOpen(true)}
+        />
 
       {/* Modals & Drawers */}
       <ItemCustomizationModal
@@ -257,6 +296,7 @@ export const CustomerPanel = () => {
           setIsOrderTrackerOpen(true);
         }}
       />
+      </div>
     </div>
   );
 };

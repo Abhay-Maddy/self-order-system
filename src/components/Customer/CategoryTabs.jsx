@@ -3,7 +3,7 @@ import React from 'react';
 export const CategoryTabs = ({ categories, activeCategory, setActiveCategory, activeSubcat, setActiveSubcat }) => {
   if (!categories || !categories.length) return null;
 
-  const currentCategoryObj = categories.find(c => c.id === activeCategory) || categories[0];
+  const currentCategoryObj = categories.find(c => String(c.id) === String(activeCategory)) || categories[0];
 
   return (
     <div style={{ marginBottom: '1.5rem' }}>
@@ -16,20 +16,23 @@ export const CategoryTabs = ({ categories, activeCategory, setActiveCategory, ac
         >
           All Items
         </button>
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => { setActiveCategory(cat.id); setActiveSubcat('all'); }}
-            className={`btn ${activeCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ borderRadius: '9999px', whiteSpace: 'nowrap' }}
-          >
-            {cat.name}
-          </button>
-        ))}
+        {categories.map(cat => {
+          const isActive = String(activeCategory) === String(cat.id);
+          return (
+            <button
+              key={cat.id}
+              onClick={() => { setActiveCategory(cat.id); setActiveSubcat('all'); }}
+              className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ borderRadius: '9999px', whiteSpace: 'nowrap' }}
+            >
+              {cat.name}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Subcategory Pills */}
-      {activeCategory !== 'all' && currentCategoryObj && currentCategoryObj.subcategories && (
+      {/* Subcategory Pills (Only if subcategories exist & more than 1) */}
+      {activeCategory !== 'all' && currentCategoryObj && currentCategoryObj.subcategories && currentCategoryObj.subcategories.length > 1 && (
         <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', marginTop: '0.75rem' }}>
           <button
             onClick={() => setActiveSubcat('all')}
@@ -38,16 +41,19 @@ export const CategoryTabs = ({ categories, activeCategory, setActiveCategory, ac
           >
             All Subcategories
           </button>
-          {currentCategoryObj.subcategories.map(sub => (
-            <button
-              key={sub.id}
-              onClick={() => setActiveSubcat(sub.id)}
-              className={`btn btn-sm ${activeSubcat === sub.id ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ borderRadius: '8px', fontSize: '0.85rem' }}
-            >
-              {sub.name}
-            </button>
-          ))}
+          {currentCategoryObj.subcategories.map(sub => {
+            const isSubActive = String(activeSubcat) === String(sub.id);
+            return (
+              <button
+                key={sub.id}
+                onClick={() => setActiveSubcat(sub.id)}
+                className={`btn btn-sm ${isSubActive ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ borderRadius: '8px', fontSize: '0.85rem' }}
+              >
+                {sub.name}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

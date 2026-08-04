@@ -1,5 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { LanguageContext } from '../../context/LanguageContext';
+import { AuthContext } from '../../context/AuthContext';
 import { QrCode, Search, ShoppingBag, Menu, History, Sparkles, X, Info, RefreshCw } from 'lucide-react';
 
 export const TableSessionHeader = ({
@@ -15,6 +16,7 @@ export const TableSessionHeader = ({
   onOpenHistory
 }) => {
   const { t } = useContext(LanguageContext);
+  const { user } = useContext(AuthContext);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTableSelectorOpen, setIsTableSelectorOpen] = useState(false);
 
@@ -29,48 +31,51 @@ export const TableSessionHeader = ({
 
   return (
     <div className="glass-card" style={{ padding: '0.85rem 1rem', marginBottom: '1.25rem', position: 'relative', zIndex: 50 }}>
-      {/* Top Header Bar: Switch Table (if no URL param) + Table Chip + Search + 3-Line Hamburger Menu Button */}
+      {/* Top Header Bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        {/* Optional Switch Table Button: Only shown when NO table param is in URL */}
-        {!hasTableParam && (
+
+        {/* RULE 1: Logged-in Staff gets "Switch Table" button in place of table chip */}
+        {user ? (
           <button
             type="button"
             onClick={() => setIsTableSelectorOpen(!isTableSelectorOpen)}
             className="btn btn-secondary"
             style={{
-              padding: '0.5rem 0.65rem',
+              padding: '0.45rem 0.75rem',
               borderRadius: '9999px',
-              fontSize: '0.78rem',
+              fontSize: '0.82rem',
               fontWeight: 700,
-              gap: '0.3rem',
+              gap: '0.35rem',
               borderColor: 'var(--brand-primary)',
               color: 'var(--brand-primary)',
               whiteSpace: 'nowrap'
             }}
             title="Switch Active Table Number"
           >
-            <RefreshCw size={13} />
-            <span>Switch Table</span>
+            <RefreshCw size={14} />
+            <span>{t('switchTable')} {selectedTable ? `(#${selectedTable})` : ''}</span>
           </button>
+        ) : (
+          /* RULE 2: Non-logged in customer showing QR table param gets ONLY Table Chip (NO switch table) */
+          hasTableParam ? (
+            <div style={{
+              background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)',
+              color: '#fff',
+              padding: '0.45rem 0.85rem',
+              borderRadius: '9999px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
+              whiteSpace: 'nowrap'
+            }}>
+              <QrCode size={16} />
+              <span>Table #{selectedTable}</span>
+            </div>
+          ) : null /* RULE 3: Non-logged in generic web visitor gets NO table chip & NO switch table button */
         )}
-
-        {/* Table Number Chip */}
-        <div style={{
-          background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)',
-          color: '#fff',
-          padding: '0.5rem 0.85rem',
-          borderRadius: '9999px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          fontWeight: 800,
-          fontSize: '0.85rem',
-          boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
-          whiteSpace: 'nowrap'
-        }}>
-          <QrCode size={16} />
-          <span>Table #{selectedTable}</span>
-        </div>
 
         {/* Search Box */}
         <div style={{ flex: 1, position: 'relative' }}>
@@ -122,8 +127,8 @@ export const TableSessionHeader = ({
         </button>
       </div>
 
-      {/* Table Selector Dropdown (When Switch Table is clicked) */}
-      {isTableSelectorOpen && !hasTableParam && (
+      {/* Table Selector Dropdown (When Switch Table is clicked by staff) */}
+      {isTableSelectorOpen && user && (
         <div
           className="glass-card animate-slide-up"
           style={{
@@ -141,7 +146,7 @@ export const TableSessionHeader = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-primary)', textTransform: 'uppercase' }}>
-              Select Table Number
+              {t('selectTable')}
             </span>
             <button onClick={() => setIsTableSelectorOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
               <X size={14} />
@@ -167,7 +172,7 @@ export const TableSessionHeader = ({
         </div>
       )}
 
-      {/* 3-Line Hamburger Dropdown Menu Overlay - Positioned UP & OVER dish cards */}
+      {/* 3-Line Hamburger Dropdown Menu Overlay */}
       {isMenuOpen && (
         <div
           className="glass-card animate-slide-up"
@@ -237,7 +242,7 @@ export const TableSessionHeader = ({
             {/* 4. Table Info Banner */}
             <div style={{ marginTop: '0.4rem', padding: '0.5rem 0.75rem', background: 'var(--bg-surface)', borderRadius: '8px', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Info size={14} color="var(--brand-primary)" />
-              <span>Self-Ordering Active for Table #{selectedTable}</span>
+              <span>Self-Ordering Active {selectedTable ? `for Table #${selectedTable}` : ''}</span>
             </div>
           </div>
         </div>

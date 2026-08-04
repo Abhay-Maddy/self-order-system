@@ -11,7 +11,14 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('staff_token');
     if (token) {
       fetchAPI('/auth/me')
-        .then((res) => setUser(res.user))
+        .then((res) => {
+          if (res && res.user) {
+            setUser(res.user);
+          } else {
+            localStorage.removeItem('staff_token');
+            setUser(null);
+          }
+        })
         .catch(() => {
           localStorage.removeItem('staff_token');
           setUser(null);

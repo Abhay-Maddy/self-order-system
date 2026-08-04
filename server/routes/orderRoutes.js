@@ -269,6 +269,31 @@ router.patch('/items/:itemId/status', verifyToken, requireRole(['chef', 'admin',
   }
 });
 
+// Admin / Cashier: Update full order status or payment status (e.g. Settle / Complete / Cancel / Refund)
+router.patch('/:id/status', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
+  try {
+    let { status, payment_status, refund_reason } = req.body;
+    const order = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
+
+    // Normalize payment_status values ('paid' -> 'completed')
+    if (payment_status === 'paid') payment_status = 'completed';
+
+    const newStatus = status || order.status;
+    const newPaymentStatus = payment_status || order.payment_status;
+
+    await runQuery(
+      'UPDATE orders SET status = ?, payment_status = ?, refund_reason = ? WHERE id = ?',
+      [newStatus, newPaymentStatus, refund_reason || order.refund_reason || null, req.params.id]
+    );
+
+    const updatedOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    res.json(updatedOrder);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Customer: Submit Ratings & Review
 router.post('/review', async (req, res) => {
   try {

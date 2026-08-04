@@ -14,6 +14,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import settingRoutes from './routes/settingRoutes.js';
 
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,9 @@ app.use(express.json());
 // Pass Socket.io to Express req
 app.set('io', io);
 
+// Health Check
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
 // Mount API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
@@ -54,18 +58,25 @@ const distPath = path.join(__dirname, '../dist');
 const distIndexPath = path.join(distPath, 'index.html');
 app.use(express.static(distPath));
 
-// Fallback all non-API routes to index.html (Fixes "Cannot GET /")
+// Fallback all non-API browser routes to index.html
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
     return next();
   }
-  import('fs').then(fs => {
-    if (fs.existsSync(distIndexPath)) {
-      res.sendFile(distIndexPath);
-    } else {
-      res.status(200).json({ message: 'Aamantran API Server is running. Frontend served separately via Vercel.' });
-    }
-  });
+  if (fs.existsSync(distIndexPath)) {
+    res.sendFile(distIndexPath);
+  } else {
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>Aamantran Self-Ordering Platform</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding: 3rem; background: #0f172a; color: #fff;">
+          <h2>🚀 Aamantran API & Socket.io Server Running</h2>
+          <p>Please open <a href="http://localhost:3000" style="color: #f97316; font-weight: bold;">http://localhost:3000/</a> to view the live web app.</p>
+        </body>
+      </html>
+    `);
+  }
 });
 
 // Socket.io Connection & Room Logic
