@@ -85,6 +85,7 @@ export const CheckoutModal = ({
         customer_phone: customerPhone || null,
         payment_mode: paymentMode,
         payment_status: paymentMode === 'online' ? 'completed' : 'pending',
+        utr_reference: upiIdInput || null,
         scheduled_time: scheduledTime,
         order_source: 'customer',
         coupon_code: appliedCoupon ? appliedCoupon.code : null,
@@ -192,12 +193,22 @@ export const CheckoutModal = ({
         {paymentMode === 'online' && (
           <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.25rem', borderColor: 'var(--brand-primary)' }}>
             {/* Online Options Sub-Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem', overflowX: 'auto' }}>
+              <button
+                type="button"
+                onClick={() => setOnlineOption('upi_apps')}
+                className={`btn btn-sm ${onlineOption === 'upi_apps' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ gap: '0.4rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+              >
+                <Smartphone size={14} />
+                <span>UPI Apps (GPay/PhonePe)</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setOnlineOption('upi_qr')}
                 className={`btn btn-sm ${onlineOption === 'upi_qr' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ gap: '0.4rem', fontSize: '0.8rem' }}
+                style={{ gap: '0.4rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
               >
                 <QrCode size={14} />
                 <span>UPI QR Code</span>
@@ -207,24 +218,76 @@ export const CheckoutModal = ({
                 type="button"
                 onClick={() => setOnlineOption('upi_id')}
                 className={`btn btn-sm ${onlineOption === 'upi_id' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ gap: '0.4rem', fontSize: '0.8rem' }}
+                style={{ gap: '0.4rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
               >
-                <Smartphone size={14} />
-                <span>UPI ID</span>
+                <span>UPI VPA ID</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setOnlineOption('card')}
                 className={`btn btn-sm ${onlineOption === 'card' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ gap: '0.4rem', fontSize: '0.8rem' }}
+                style={{ gap: '0.4rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
               >
                 <CreditCard size={14} />
                 <span>Card</span>
               </button>
             </div>
 
-            {/* Sub-Option 1: UPI QR CODE */}
+            {/* Sub-Option 1: UPI DIRECT APP DEEP-LINKS */}
+            {onlineOption === 'upi_apps' && (
+              <div>
+                <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                  Tap your preferred app to pay <strong style={{ color: 'var(--brand-primary)' }}>{formatCurrency(grandTotal)}</strong> to <code>{merchantUpiId}</code>:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1rem' }}>
+                  <a
+                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
+                    className="btn btn-secondary"
+                    style={{ background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
+                  >
+                    <span>🌐 Google Pay</span>
+                  </a>
+                  <a
+                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
+                    className="btn btn-secondary"
+                    style={{ background: '#f3e8ff', color: '#6b21a8', borderColor: '#e9d5ff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
+                  >
+                    <span>🟣 PhonePe</span>
+                  </a>
+                  <a
+                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
+                    className="btn btn-secondary"
+                    style={{ background: '#e0e7ff', color: '#3730a3', borderColor: '#c7d2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
+                  >
+                    <span>🔷 Paytm</span>
+                  </a>
+                  <a
+                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
+                    className="btn btn-secondary"
+                    style={{ background: '#fef3c7', color: '#92400e', borderColor: '#fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
+                  >
+                    <span>🇮🇳 BHIM / Any UPI</span>
+                  </a>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                    12-Digit UTR / Ref No (Optional for instant verification):
+                  </label>
+                  <input
+                    type="text"
+                    value={upiIdInput}
+                    onChange={(e) => setUpiIdInput(e.target.value)}
+                    placeholder="e.g. 423456789012"
+                    className="input-field"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Sub-Option 2: UPI QR CODE */}
             {onlineOption === 'upi_qr' && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ display: 'inline-block', background: '#fff', padding: '0.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-md)', marginBottom: '0.75rem' }}>
@@ -253,27 +316,37 @@ export const CheckoutModal = ({
               </div>
             )}
 
-            {/* Sub-Option 2: UPI ID INPUT */}
+            {/* Sub-Option 3: UPI ID INPUT */}
             {onlineOption === 'upi_id' && (
               <div>
                 <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '0.4rem' }}>
-                  Enter UPI VPA / ID:
+                  Enter Merchant UPI VPA:
+                </label>
+                <input
+                  type="text"
+                  value={merchantUpiId}
+                  readOnly
+                  className="input-field"
+                  style={{ marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 700 }}
+                />
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '0.4rem' }}>
+                  Your 12-Digit UTR / Transaction Reference No:
                 </label>
                 <input
                   type="text"
                   value={upiIdInput}
                   onChange={(e) => setUpiIdInput(e.target.value)}
-                  placeholder="9876543210@paytm or name@okicici"
+                  placeholder="e.g. 423456789012"
                   className="input-field"
                   style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}
                 />
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  A payment request notification will be sent to your UPI app for instant approval.
+                  Pay via your UPI app using ID above, then enter the 12-digit UTR number for admin verification.
                 </p>
               </div>
             )}
 
-            {/* Sub-Option 3: CARDS */}
+            {/* Sub-Option 4: CARDS */}
             {onlineOption === 'card' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <input type="text" placeholder="Card Number (4532 •••• •••• 8901)" className="input-field" style={{ fontSize: '0.85rem' }} />

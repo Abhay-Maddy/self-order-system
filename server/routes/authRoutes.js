@@ -214,4 +214,27 @@ router.put('/staff/:id', verifyToken, requireRole(['admin']), async (req, res) =
   }
 });
 
+// Admin: Quick Approve or Reject a pending staff request (used by StaffApprovalManager)
+router.patch('/staff/:id/status', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['approved', 'rejected', 'pending', 'deactivated'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be: approved, rejected, pending, or deactivated.' });
+    }
+
+    const targetUser = await getQuery('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+    if (targetUser.is_main_admin === 1) {
+      return res.status(403).json({ error: 'Cannot change status of the Main Admin account.' });
+    }
+
+    await runQuery('UPDATE users SET status = ? WHERE id = ?', [status, req.params.id]);
+    res.json({ message: `User status updated to '${status}' successfully.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

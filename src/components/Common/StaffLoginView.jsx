@@ -143,10 +143,10 @@ export const StaffLoginView = ({ onLoginSuccess, defaultRole = 'chef' }) => {
                 className="input-field"
                 style={{ fontWeight: 700, fontSize: '0.9rem' }}
               >
-                <option value="chef">👨‍🍳 Chef / Kitchen</option>
-                <option value="waiter">🤵 Waiter / Server</option>
                 <option value="admin">📊 Owner / Admin</option>
                 <option value="cashier">💳 Billing Cashier</option>
+                <option value="chef">👨‍🍳 Chef / Kitchen</option>
+                <option value="waiter">🤵 Waiter / Server</option>
               </select>
             </div>
 

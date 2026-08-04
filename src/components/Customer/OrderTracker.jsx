@@ -4,7 +4,7 @@ import { formatCurrency, formatTime } from '../../utils/formatters';
 import { LanguageContext } from '../../context/LanguageContext';
 import { CheckCircle2, Clock, XCircle, ChefHat, Bell, Star } from 'lucide-react';
 
-export const OrderTracker = ({ order, isOpen, onClose, onOpenRating }) => {
+export const OrderTracker = ({ order, isOpen, onClose, onOpenRating, onUpdateOrder }) => {
   const { t } = useContext(LanguageContext);
   const [timeLeftStr, setTimeLeftStr] = React.useState('');
   const [isOverdue, setIsOverdue] = React.useState(false);
@@ -116,11 +116,29 @@ export const OrderTracker = ({ order, isOpen, onClose, onOpenRating }) => {
           {order.items && order.items.map(item => (
             <div key={item.id} className="glass-card" style={{ padding: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{item.quantity}x {item.item_name}</span>
-                  <span className={`badge ${item.fulfillment_type === 'dine_in' ? 'badge-dinein' : 'badge-packing'}`}>
-                    {item.fulfillment_type === 'dine_in' ? 'Dine-In' : 'Packing'}
-                  </span>
+                  <button
+                    onClick={async () => {
+                      const nextType = item.fulfillment_type === 'dine_in' ? 'packing' : 'dine_in';
+                      try {
+                        await fetchAPI(`/orders/items/${item.id}/fulfillment`, {
+                          method: 'PATCH',
+                          body: JSON.stringify({ fulfillment_type: nextType })
+                        });
+                        if (order && onUpdateOrder) {
+                          onUpdateOrder();
+                        }
+                      } catch (err) {
+                        alert(err.message);
+                      }
+                    }}
+                    title="Click to switch Dine-In / Packing"
+                    className={`badge ${item.fulfillment_type === 'dine_in' ? 'badge-dinein' : 'badge-packing'}`}
+                    style={{ cursor: 'pointer', border: '1px dashed currentColor' }}
+                  >
+                    {item.fulfillment_type === 'dine_in' ? '🍽️ Dine-In (Click to Pack)' : '📦 Packing (Click for Dine-In)'}
+                  </button>
                 </div>
                 {getItemStatusBadge(item.status)}
               </div>

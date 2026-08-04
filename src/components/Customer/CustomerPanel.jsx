@@ -101,6 +101,20 @@ export const CustomerPanel = () => {
     }
   }, [selectedTable, socket]);
 
+  // Restore active order from localStorage on mount / reload
+  useEffect(() => {
+    const savedOrderId = localStorage.getItem('aamantran_last_order_id');
+    if (savedOrderId) {
+      fetchAPI(`/orders/track/${savedOrderId}`)
+        .then(order => {
+          if (order && order.status !== 'completed' && order.status !== 'cancelled') {
+            setActiveOrder(order);
+          }
+        })
+        .catch(err => console.error('Failed to restore active order:', err));
+    }
+  }, []);
+
   // Real-time item status update listener
   useEffect(() => {
     if (!socket) return;
@@ -163,6 +177,9 @@ export const CustomerPanel = () => {
     });
 
     setActiveOrder(createdOrder);
+    if (createdOrder && createdOrder.id) {
+      localStorage.setItem('aamantran_last_order_id', createdOrder.id);
+    }
     setCart([]);
     setAppliedCoupon(null);
     setIsOrderTrackerOpen(true);
@@ -280,6 +297,13 @@ export const CustomerPanel = () => {
         isOpen={isOrderTrackerOpen}
         onClose={() => setIsOrderTrackerOpen(false)}
         onOpenRating={() => setIsRatingOpen(true)}
+        onUpdateOrder={() => {
+          if (activeOrder) {
+            fetchAPI(`/orders/track/${activeOrder.id}`)
+              .then(refreshed => setActiveOrder(refreshed))
+              .catch(err => console.error(err));
+          }
+        }}
       />
 
       <GoogleReviewModal
@@ -291,8 +315,8 @@ export const CustomerPanel = () => {
       <OrderHistoryModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        onSelectOrderToTrack={(ord) => {
-          setActiveOrder(ord);
+        onSelectOrderToTrack={(selectedOrd) => {
+          setActiveOrder(selectedOrd);
           setIsOrderTrackerOpen(true);
         }}
       />

@@ -356,4 +356,128 @@ router.get('/customers', verifyToken, requireRole(['admin', 'cashier']), async (
   }
 });
 
+// Kitchen alias route — mirrors /orders/active for kitchen display
+router.get('/kitchen', async (req, res) => {
+  try {
+    const orders = await allQuery(`SELECT * FROM orders WHERE status = 'active' ORDER BY id ASC`);
+    const allItems = await allQuery(`SELECT * FROM order_items ORDER BY id ASC`);
+    const result = orders.map(ord => ({
+      ...ord,
+      items: allItems.filter(it => it.order_id === ord.id)
+    }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: Get ALL orders (optionally filtered by date) for dashboard day-by-day view
+router.get('/all', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
+  try {
+    const { date, status, payment_status } = req.query;
+    let conditions = [];
+    let params = [];
+
+    if (date) {
+      conditions.push(`DATE(created_at) = ?`);
+      params.push(date);
+    }
+    if (status) {
+      conditions.push(`status = ?`);
+      params.push(status);
+    }
+    if (payment_status) {
+      conditions.push(`payment_status = ?`);
+      params.push(payment_status);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const orders = await allQuery(`SELECT * FROM orders ${where} ORDER BY id DESC`, params);
+    const allItems = await allQuery(`SELECT * FROM order_items ORDER BY id ASC`);
+
+    const result = orders.map(ord => ({
+      ...ord,
+      items: allItems.filter(it => it.order_id === ord.id)
+    }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin/Cashier: Verify cash payment and mark as completed
+router.patch('/:id/payment-verify', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
+  try {
+    const { payment_status = 'completed', utr_reference } = req.body;
+    const order = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
+
+    await runQuery(
+      'UPDATE orders SET payment_status = ?, utr_reference = ? WHERE id = ?',
+      [payment_status, utr_reference || order.utr_reference || null, req.params.id]
+    );
+
+    const updatedOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+
+    // Emit to admin/cashier rooms
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admin').emit('order_updated', updatedOrder);
+      io.to('kitchen').emit('order_updated', updatedOrder);
+    }
+
+    res.json(updatedOrder);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Customer/Staff: Change fulfillment type (dine_in ↔ packing) on an order item
+router.patch('/items/:itemId/fulfillment', async (req, res) => {
+  try {
+    const { fulfillment_type } = req.body;
+    if (!['dine_in', 'packing'].includes(fulfillment_type)) {
+      return res.status(400).json({ error: 'fulfillment_type must be dine_in or packing.' });
+    }
+    const item = await getQuery('SELECT * FROM order_items WHERE id = ?', [req.params.itemId]);
+    if (!item) return res.status(404).json({ error: 'Order item not found.' });
+
+    await runQuery('UPDATE order_items SET fulfillment_type = ? WHERE id = ?', [fulfillment_type, req.params.itemId]);
+    const updated = await getQuery('SELECT * FROM order_items WHERE id = ?', [req.params.itemId]);
+
+    const io = req.app.get('io');
+    if (io) {
+      const parentOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [item.order_id]);
+      const allItems = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [item.order_id]);
+      const payload = { ...parentOrder, items: allItems };
+      io.to('kitchen').emit('order_updated', payload);
+      io.to('admin').emit('order_updated', payload);
+    }
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Customer: Save UTR reference after UPI payment
+router.patch('/:id/utr', async (req, res) => {
+  try {
+    const { utr_reference } = req.body;
+    if (!utr_reference || !utr_reference.trim()) {
+      return res.status(400).json({ error: 'UTR reference is required.' });
+    }
+    const order = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
+
+    await runQuery(
+      'UPDATE orders SET utr_reference = ?, payment_status = ? WHERE id = ?',
+      [utr_reference.trim(), 'pending_verification', req.params.id]
+    );
+    res.json({ message: 'UTR reference saved. Payment pending admin verification.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

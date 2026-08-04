@@ -4,6 +4,7 @@ import { CustomerPanel } from './components/Customer/CustomerPanel';
 import { KitchenPanel } from './components/Kitchen/KitchenPanel';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { StaffLoginView } from './components/Common/StaffLoginView';
+import { BellAlert } from './components/Common/BellAlert';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider, AuthContext } from './context/AuthContext';
@@ -88,14 +89,14 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
+  const [activePanel, setActivePanel] = useState('customer'); // 'customer', 'kitchen', 'admin', 'staff-login'
   const { user, loading } = useContext(AuthContext);
-  const [activePanel, setActivePanel] = useState('customer');
 
-  // Auto-redirect if user logs in while on 'staff-login' view
   useEffect(() => {
     if (user && activePanel === 'staff-login') {
-      const target = ['chef', 'waiter'].includes(user.role) ? 'kitchen' : 'admin';
-      setActivePanel(target);
+      if (user.role === 'chef') setActivePanel('kitchen');
+      else if (user.role === 'admin') setActivePanel('admin');
+      else setActivePanel('kitchen');
     }
   }, [user, activePanel]);
 
@@ -108,15 +109,13 @@ function AppContent() {
         alignItems: 'center',
         justifyContent: 'center',
         background: '#0f172a',
-        color: '#ffffff'
+        color: '#f97316'
       }}>
         <div style={{
-          background: 'linear-gradient(135deg, #f97316, #f59e0b)',
-          padding: '1rem',
-          borderRadius: '20px',
-          color: '#ffffff',
-          marginBottom: '1rem',
-          boxShadow: '0 10px 30px rgba(249, 115, 22, 0.4)'
+          padding: '1.5rem',
+          borderRadius: '50%',
+          background: 'rgba(249, 115, 22, 0.1)',
+          marginBottom: '1rem'
         }}>
           <Utensils size={40} className="animate-bounce" />
         </div>
@@ -129,6 +128,7 @@ function AppContent() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar activePanel={activePanel} setActivePanel={setActivePanel} />
+      <BellAlert />
       
       <main style={{ flex: 1 }}>
         {activePanel === 'customer' && <CustomerPanel />}
