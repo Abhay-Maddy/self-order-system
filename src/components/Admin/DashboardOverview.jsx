@@ -223,6 +223,21 @@ export const DashboardOverview = () => {
       {printingOrder && (
         <Modal isOpen={Boolean(printingOrder)} onClose={() => setPrintingOrder(null)} title={`Customer Bill #${printingOrder.order_number}`}>
           <div>
+            {/* Top Close / Cut Action Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--bg-surface-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                🖨️ Tax Invoice & Bill Preview
+              </span>
+              <button
+                onClick={() => setPrintingOrder(null)}
+                className="btn btn-danger btn-sm"
+                style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                title="Close Bill View"
+              >
+                <span>✖ Cut / Close Bill</span>
+              </button>
+            </div>
+
             <div id="printable-bill" style={{ background: '#fff', color: '#000', padding: '1.5rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
               <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
                 <h3 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 900 }}>AAMANTRAN RESTAURANT</h3>
@@ -283,7 +298,9 @@ export const DashboardOverview = () => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
-              <button onClick={() => setPrintingOrder(null)} className="btn btn-secondary">Close</button>
+              <button onClick={() => setPrintingOrder(null)} className="btn btn-danger" style={{ padding: '0.5rem 1rem' }}>
+                ✖ Close / Cancel
+              </button>
               <button
                 onClick={() => {
                   window.print();
@@ -297,6 +314,7 @@ export const DashboardOverview = () => {
           </div>
         </Modal>
       )}
+
     </div>
   );
 };

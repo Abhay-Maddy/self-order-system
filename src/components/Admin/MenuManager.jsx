@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchAPI } from '../../utils/api';
 import { formatCurrency } from '../../utils/formatters';
 import { Modal } from '../Common/Modal';
-import { Plus, Edit, Trash2, FolderPlus, Layers, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, FolderPlus, Layers, ChevronUp, ChevronDown, Image as ImageIcon, Upload, Link as LinkIcon } from 'lucide-react';
 
 export const MenuManager = () => {
   const [categories, setCategories] = useState([]);
@@ -19,6 +19,18 @@ export const MenuManager = () => {
 
   // Filter by category in admin table view
   const [filterCategoryId, setFilterCategoryId] = useState('all');
+  const [imageInputType, setImageInputType] = useState('link'); // 'link' or 'gallery'
+
+  const handleGalleryFileSelect = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        setFormData(prev => ({ ...prev, image_url: uploadEvent.target.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const [formData, setFormData] = useState({
     subcategory_id: 1,
@@ -470,8 +482,74 @@ export const MenuManager = () => {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Image URL</label>
-            <input type="url" className="input-field" value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} />
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+              Dish Photo Option:
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setImageInputType('link')}
+                className={`btn btn-sm ${imageInputType === 'link' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ gap: '0.4rem', fontSize: '0.8rem' }}
+              >
+                <LinkIcon size={14} />
+                <span>Option 1: Paste Link URL</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setImageInputType('gallery')}
+                className={`btn btn-sm ${imageInputType === 'gallery' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ gap: '0.4rem', fontSize: '0.8rem' }}
+              >
+                <ImageIcon size={14} />
+                <span>Option 2: Pick from Gallery / Device</span>
+              </button>
+            </div>
+
+            {imageInputType === 'link' ? (
+              <div>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="https://images.unsplash.com/photo-..."
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                  style={{ fontSize: '0.85rem' }}
+                />
+              </div>
+            ) : (
+              <div style={{ border: '2px dashed var(--border-color)', padding: '1rem', borderRadius: '10px', textAlign: 'center', background: 'var(--bg-surface-elevated)' }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGalleryFileSelect}
+                  style={{ display: 'none' }}
+                  id="gallery-file-input"
+                />
+                <label htmlFor="gallery-file-input" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', gap: '0.4rem', display: 'inline-flex' }}>
+                  <Upload size={14} /> Choose Photo from Device / Gallery
+                </label>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                  Supports PNG, JPG, WEBP photos from your gallery
+                </div>
+              </div>
+            )}
+
+            {/* Live Image Preview */}
+            {formData.image_url && (
+              <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <img
+                  src={formData.image_url}
+                  alt="Dish preview"
+                  style={{ width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover' }}
+                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600'; }}
+                />
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  ✅ Image Ready & Previewed
+                </span>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>

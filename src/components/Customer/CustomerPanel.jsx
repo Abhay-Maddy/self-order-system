@@ -11,7 +11,9 @@ import { OrderHistoryModal } from './OrderHistoryModal';
 import { AamantranSplash } from './AamantranSplash';
 import { BottomCartBar } from './BottomCartBar';
 import { WelcomeLanding } from './WelcomeLanding';
-import { PageSkeleton } from '../Common/PageSkeleton';
+import { Modal } from '../Common/Modal';
+import { Printer, Download, FileText } from 'lucide-react';
+import { formatCurrency, formatTime } from '../../utils/formatters';
 import { fetchAPI } from '../../utils/api';
 import { SocketContext } from '../../context/SocketContext';
 import { AuthContext } from '../../context/AuthContext';
@@ -54,6 +56,7 @@ export const CustomerPanel = () => {
   const [isOrderTrackerOpen, setIsOrderTrackerOpen] = useState(false);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isCustomerBillOpen, setIsCustomerBillOpen] = useState(false);
   const [tamperAlert, setTamperAlert] = useState(false);
 
   // Parse query param table with anti-tamper session security
@@ -238,6 +241,13 @@ export const CustomerPanel = () => {
           activeOrder={activeOrder}
           onOpenOrderTracker={() => setIsOrderTrackerOpen(true)}
           onOpenHistory={() => setIsHistoryOpen(true)}
+          onOpenBillInvoice={() => {
+            if (activeOrder) {
+              setIsCustomerBillOpen(true);
+            } else {
+              setIsHistoryOpen(true);
+            }
+          }}
         />
 
         {isLoadingMenu ? (
@@ -320,6 +330,85 @@ export const CustomerPanel = () => {
           setIsOrderTrackerOpen(true);
         }}
       />
+
+      {/* CUSTOMER BILL INVOICE MODAL */}
+      {isCustomerBillOpen && activeOrder && (
+        <Modal isOpen={isCustomerBillOpen} onClose={() => setIsCustomerBillOpen(false)} title={`Bill Invoice #${activeOrder.order_number}`}>
+          <div>
+            <div style={{ background: '#fff', color: '#000', padding: '1.25rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+              <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '0.6rem', marginBottom: '0.6rem' }}>
+                <h3 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 900 }}>AAMANTRAN RESTAURANT</h3>
+                <div>Tax Invoice & Bill Receipt • Table #{activeOrder.table_number}</div>
+                <div>Date: {new Date(activeOrder.created_at).toLocaleString()}</div>
+                <div>Order Ref: #{activeOrder.order_number}</div>
+              </div>
+
+              <table style={{ width: '100%', marginBottom: '0.6rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>
+                    <th style={{ padding: '0.25rem 0' }}>Qty & Item</th>
+                    <th style={{ padding: '0.25rem 0', textAlign: 'right' }}>Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(activeOrder.items || []).map((it, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px dotted #ccc' }}>
+                      <td style={{ padding: '0.25rem 0' }}>
+                        {it.quantity}x {it.item_name}
+                        {it.fulfillment_type === 'packing' && ' [PACKING]'}
+                      </td>
+                      <td style={{ padding: '0.25rem 0', textAlign: 'right' }}>
+                        ₹{(it.total_price || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div style={{ borderTop: '1px dashed #000', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.82rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal:</span>
+                  <span>₹{(activeOrder.total_amount || 0).toFixed(2)}</span>
+                </div>
+                {activeOrder.discount_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Discount:</span>
+                    <span>-₹{(activeOrder.discount_amount || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>GST Tax (5%):</span>
+                  <span>₹{(activeOrder.tax_amount || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '0.95rem', borderTop: '1px solid #000', paddingTop: '0.35rem', marginTop: '0.2rem' }}>
+                  <span>GRAND TOTAL:</span>
+                  <span>₹{(activeOrder.net_amount || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ marginTop: '0.35rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+                  Payment: {activeOrder.payment_mode.toUpperCase()} ({activeOrder.payment_status.toUpperCase()})
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: '0.75rem', paddingTop: '0.4rem', borderTop: '1px dashed #000', fontSize: '0.72rem' }}>
+                Thank you for dining at Aamantran! Visit again soon!
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <button onClick={() => setIsCustomerBillOpen(false)} className="btn btn-secondary">Close</button>
+              <button
+                onClick={() => {
+                  window.print();
+                }}
+                className="btn btn-primary"
+                style={{ gap: '0.4rem' }}
+              >
+                <Printer size={16} /> Download / Print Bill
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
       </div>
     </div>
   );

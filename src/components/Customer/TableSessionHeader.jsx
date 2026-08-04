@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { LanguageContext } from '../../context/LanguageContext';
 import { AuthContext } from '../../context/AuthContext';
-import { QrCode, Search, ShoppingBag, Menu, History, Sparkles, X, Info, RefreshCw } from 'lucide-react';
+import { QrCode, Search, ShoppingBag, Menu, History, Sparkles, X, Info, RefreshCw, FileText } from 'lucide-react';
 
 export const TableSessionHeader = ({
   selectedTable,
@@ -13,7 +13,8 @@ export const TableSessionHeader = ({
   onOpenCart,
   activeOrder,
   onOpenOrderTracker,
-  onOpenHistory
+  onOpenHistory,
+  onOpenBillInvoice
 }) => {
   const { t } = useContext(LanguageContext);
   const { user } = useContext(AuthContext);
@@ -227,7 +228,17 @@ export const TableSessionHeader = ({
               <span>Click to Watch History</span>
             </button>
 
-            {/* 3. Track Active Order (if exists) */}
+            {/* 3. View & Download Bill Invoice */}
+            <button
+              onClick={() => { setIsMenuOpen(false); if (onOpenBillInvoice) onOpenBillInvoice(); }}
+              className="btn btn-secondary"
+              style={{ width: '100%', justifyContent: 'flex-start', gap: '0.6rem', padding: '0.65rem 0.85rem', color: 'var(--success)', borderColor: 'var(--success)', fontWeight: 700 }}
+            >
+              <FileText size={18} />
+              <span>View & Download Bill Invoice</span>
+            </button>
+
+            {/* 4. Track Active Order (if exists) */}
             {activeOrder && (
               <button
                 onClick={() => { setIsMenuOpen(false); onOpenOrderTracker(); }}
