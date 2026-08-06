@@ -89,16 +89,16 @@ router.post('/', async (req, res) => {
     const finalTotal = netBeforeTax + taxAmount;
 
     // 4. Create Order
-    const { scheduled_time, order_source = 'customer' } = req.body;
+    const { scheduled_time, order_source = 'customer', placed_by_name = '', placed_by_role = '' } = req.body;
     const orderNumber = generateOrderNumber();
     const defaultPrepMins = 15;
     const initialEstimatedReadyAt = new Date(Date.now() + defaultPrepMins * 60 * 1000).toISOString();
 
     const orderRes = await runQuery(`
       INSERT INTO orders
-      (order_number, table_number, customer_phone, payment_mode, payment_status, total_amount, tax_amount, discount_amount, net_amount, status, order_source, scheduled_time, prep_time_minutes, estimated_ready_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `, [orderNumber, table_number, customer_phone || null, payment_mode || 'cash', payment_mode === 'online' ? 'completed' : 'pending', subtotal, taxAmount, discountAmount, finalTotal, order_source, scheduled_time || 'ASAP (~15 mins)', defaultPrepMins, initialEstimatedReadyAt]);
+      (order_number, table_number, customer_phone, payment_mode, payment_status, total_amount, tax_amount, discount_amount, net_amount, status, order_source, placed_by_name, placed_by_role, scheduled_time, prep_time_minutes, estimated_ready_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+    `, [orderNumber, table_number, customer_phone || null, payment_mode || 'cash', payment_mode === 'online' ? 'completed' : 'pending', subtotal, taxAmount, discountAmount, finalTotal, order_source, placed_by_name || '', placed_by_role || '', scheduled_time || 'ASAP (~15 mins)', defaultPrepMins, initialEstimatedReadyAt]);
 
     const orderId = orderRes.lastID;
 
@@ -359,7 +359,21 @@ router.get('/customers', verifyToken, requireRole(['admin', 'cashier']), async (
 // Kitchen alias route — mirrors /orders/active for kitchen display
 router.get('/kitchen', async (req, res) => {
   try {
-    const orders = await allQuery(`SELECT * FROM orders WHERE status = 'active' ORDER BY id ASC`);
+    const { date } = req.query;
+    let orders;
+    if (date) {
+      // Query specific past date orders
+      orders = await allQuery(`SELECT * FROM orders WHERE DATE(created_at) = ? OR DATE(created_at, 'localtime') = ? ORDER BY id ASC`, [date, date]);
+    } else {
+      // Default to current active orders (plus today's active/completed orders)
+      const d = new Date();
+      const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      orders = await allQuery(`
+        SELECT * FROM orders 
+        WHERE status = 'active' OR DATE(created_at) = ? OR DATE(created_at, 'localtime') = ?
+        ORDER BY id ASC
+      `, [todayStr, todayStr]);
+    }
     const allItems = await allQuery(`SELECT * FROM order_items ORDER BY id ASC`);
     const result = orders.map(ord => ({
       ...ord,
@@ -370,6 +384,7 @@ router.get('/kitchen', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Admin: Get ALL orders (optionally filtered by date) for dashboard day-by-day view
 router.get('/all', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
@@ -480,4 +495,31 @@ router.patch('/:id/utr', async (req, res) => {
   }
 });
 
+// Admin/Cashier: Process refund on an order (A10)
+router.patch('/:id/refund', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
+  try {
+    const { refund_reason } = req.body;
+    const order = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
+
+    await runQuery(
+      "UPDATE orders SET payment_status = 'refunded', status = 'refunded', refund_reason = ? WHERE id = ?",
+      [refund_reason || 'N/A', req.params.id]
+    );
+
+    const updatedOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admin').emit('order_updated', updatedOrder);
+      io.to('kitchen').emit('order_updated', updatedOrder);
+    }
+
+    res.json(updatedOrder);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
+

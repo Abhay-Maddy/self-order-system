@@ -7,9 +7,10 @@ const router = express.Router();
 // Admin: Analytics Summary (Revenue, order count, avg prep time, top seller)
 router.get('/analytics', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
   try {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const totalRevRow = await getQuery("SELECT SUM(net_amount) as total FROM orders WHERE DATE(created_at) = ?", [todayStr]);
-    const todayOrdersRow = await getQuery("SELECT COUNT(*) as total FROM orders WHERE DATE(created_at) = ?", [todayStr]);
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const totalRevRow = await getQuery("SELECT SUM(net_amount) as total FROM orders WHERE DATE(created_at) = ? OR DATE(created_at, 'localtime') = ?", [todayStr, todayStr]);
+    const todayOrdersRow = await getQuery("SELECT COUNT(*) as total FROM orders WHERE DATE(created_at) = ? OR DATE(created_at, 'localtime') = ?", [todayStr, todayStr]);
     const totalOrdersRow = await getQuery("SELECT COUNT(*) as total FROM orders");
     const activeOrdersRow = await getQuery("SELECT COUNT(*) as total FROM orders WHERE status = 'active'");
     

@@ -91,7 +91,8 @@ export const MenuManager = () => {
       spice_level: 'medium',
       image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600',
       stock_quantity: 40,
-      low_stock_threshold: 5
+      low_stock_threshold: 5,
+      has_customization: false
     });
     setIsModalOpen(true);
   };
@@ -111,36 +112,48 @@ export const MenuManager = () => {
       spice_level: item.spice_level || 'medium',
       image_url: item.image_url || '',
       stock_quantity: item.stock_quantity,
-      low_stock_threshold: item.low_stock_threshold
+      low_stock_threshold: item.low_stock_threshold,
+      has_customization: Boolean(item.has_customization)
     });
     setIsModalOpen(true);
   };
 
-  const handleDeleteItem = async (itemId) => {
-    if (window.confirm('Delete this menu item?')) {
-      await fetchAPI(`/menu/items/${itemId}`, { method: 'DELETE' });
-      loadMenu();
-    }
-  };
+  const [menuStatusMsg, setMenuStatusMsg] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMenuStatusMsg('');
     try {
       if (editingItem) {
         await fetchAPI(`/menu/items/${editingItem.id}`, {
           method: 'PUT',
           body: JSON.stringify(formData)
         });
+        setMenuStatusMsg(`✓ Dish '${formData.name}' updated successfully!`);
       } else {
         await fetchAPI('/menu/items', {
           method: 'POST',
           body: JSON.stringify(formData)
         });
+        setMenuStatusMsg(`✓ New Dish '${formData.name}' added successfully!`);
       }
       setIsModalOpen(false);
       loadMenu();
+      setTimeout(() => setMenuStatusMsg(''), 4000);
     } catch (err) {
-      alert(err.message);
+      setMenuStatusMsg(`⚠️ Error: ${err.message}`);
+    }
+  };
+
+  // Delete Dish
+  const handleDeleteItem = async (itemId) => {
+    try {
+      await fetchAPI(`/menu/items/${itemId}`, { method: 'DELETE' });
+      setMenuStatusMsg('✓ Dish deleted successfully.');
+      loadMenu();
+      setTimeout(() => setMenuStatusMsg(''), 4000);
+    } catch (err) {
+      setMenuStatusMsg(`⚠️ Error: ${err.message}`);
     }
   };
 
@@ -204,7 +217,6 @@ export const MenuManager = () => {
           sort_order: categories.length + 1
         })
       });
-      // Automatically create a default subcategory container for this main category
       if (res && res.id) {
         await fetchAPI('/menu/subcategories', {
           method: 'POST',
@@ -217,23 +229,26 @@ export const MenuManager = () => {
       }
       setNewCatName('');
       setNewCatDesc('');
+      setMenuStatusMsg(`✓ Main Category '${newCatName.trim()}' added successfully!`);
       loadMenu();
-      alert('New Main Category added successfully!');
+      setTimeout(() => setMenuStatusMsg(''), 4000);
     } catch (err) {
-      alert(err.message);
+      setMenuStatusMsg(`⚠️ Error: ${err.message}`);
     }
   };
 
   // Delete Main Category
   const handleDeleteCategory = async (catId, catName) => {
-    if (!window.confirm(`Are you sure you want to delete Main Category '${catName}'?`)) return;
     try {
       await fetchAPI(`/menu/categories/${catId}`, { method: 'DELETE' });
+      setMenuStatusMsg(`✓ Main Category '${catName}' deleted.`);
       loadMenu();
+      setTimeout(() => setMenuStatusMsg(''), 4000);
     } catch (err) {
-      alert(err.message);
+      setMenuStatusMsg(`⚠️ Error: ${err.message}`);
     }
   };
+
 
   return (
     <div className="glass-card" style={{ padding: '1.5rem' }}>
@@ -259,6 +274,21 @@ export const MenuManager = () => {
           </button>
         </div>
       </div>
+
+      {menuStatusMsg && (
+        <div style={{
+          padding: '0.65rem 1rem',
+          borderRadius: '8px',
+          fontSize: '0.85rem',
+          fontWeight: 700,
+          marginBottom: '1rem',
+          background: menuStatusMsg.startsWith('✓') ? 'var(--success-bg)' : 'var(--danger-bg)',
+          color: menuStatusMsg.startsWith('✓') ? 'var(--success)' : 'var(--danger)',
+          border: `1px solid ${menuStatusMsg.startsWith('✓') ? 'var(--success)' : 'var(--danger)'}`
+        }}>
+          {menuStatusMsg}
+        </div>
+      )}
 
       {/* Category Filter */}
       <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -330,7 +360,7 @@ export const MenuManager = () => {
                     <span className={`badge ${item.is_veg ? 'badge-veg' : 'badge-nonveg'}`} style={{ marginRight: '0.3rem' }}>
                       {item.is_veg ? 'VEG' : 'NON-VEG'}
                     </span>
-                    {item.tags && item.tags.split(',').map((t, i) => (
+                    {typeof item.tags === 'string' && item.tags.trim() && item.tags.split(',').map((t, i) => (
                       <span key={i} className="badge" style={{ background: 'var(--bg-surface-elevated)', marginRight: '0.2rem', fontSize: '0.7rem' }}>
                         {t.trim()}
                       </span>
@@ -479,6 +509,19 @@ export const MenuManager = () => {
           <div>
             <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Description</label>
             <textarea className="input-field" rows="2" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}></textarea>
+          </div>
+
+          <div style={{ background: 'var(--bg-surface-elevated)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Enable Customization Modal</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>If enabled, clicking '+ Add' opens customization. If disabled, directly adds to cart.</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={formData.has_customization}
+              onChange={(e) => setFormData({ ...formData, has_customization: e.target.checked })}
+              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+            />
           </div>
 
           <div>

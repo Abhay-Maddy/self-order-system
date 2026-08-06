@@ -4,15 +4,17 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run server\" \"vite\"",
+    "dev:client": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
     "start": "node start.js",
-    "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
+    "dev:all": "concurrently \"npm run server\" \"npm run dev:client\"",
     "postinstall": "npm rebuild sqlite3 --build-from-source"
   },
   "dependencies": {
+    "@vitalets/google-translate-api": "^9.2.1",
     "@vitejs/plugin-react": "^4.3.4",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^13.0.2",

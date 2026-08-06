@@ -6,8 +6,8 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
 
   useEffect(() => {
+    if (!order || !order.created_at) return;
     const calculateElapsed = () => {
-      if (!order.created_at) return;
       const start = new Date(order.created_at).getTime();
       const diff = Math.floor((Date.now() - start) / (1000 * 60));
       setElapsedMinutes(diff);
@@ -19,6 +19,8 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
   }, [order.created_at]);
 
   const isOverdue = elapsedMinutes > 15; // Visual alert if > 15m
+
+  if (!order) return null;
 
   return (
     <div
@@ -37,14 +39,14 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
               TABLE #{order.table_number}
             </span>
 
-            {/* Green vs Yellow Order Origin Dot Indicator */}
-            {order.order_source === 'waiter' ? (
+            {/* Green Customer QR vs Yellow Staff Order Origin Badge */}
+            {order.order_source === 'staff' || order.placed_by_name ? (
               <span className="badge" style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #f59e0b', fontSize: '0.75rem', fontWeight: 800 }}>
-                🟡 Waiter Order
+                🟡 {order.placed_by_name || 'Staff'} ({order.placed_by_role || 'Authorized'})
               </span>
             ) : (
               <span className="badge" style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #22c55e', fontSize: '0.75rem', fontWeight: 800 }}>
-                🟢 Customer QR
+                🟢 Customer QR Order
               </span>
             )}
           </div>
@@ -114,7 +116,7 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
                 {item.status === 'pending' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Prep time:</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Prep:</span>
                       <select
                         id={`prep-mins-${item.id}`}
                         defaultValue="15"
@@ -136,16 +138,16 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
                           onItemStatusChange(item.id, 'accepted', null, mins);
                         }}
                         className="btn btn-success btn-sm"
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}
                       >
-                        Accept & Set Time
+                        ✓ Accept
                       </button>
                       <button
                         onClick={() => onOpenRejectModal(item)}
                         className="btn btn-danger btn-sm"
                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                       >
-                        Reject
+                        ✕ Reject
                       </button>
                     </div>
                   </div>
@@ -155,9 +157,9 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
                   <button
                     onClick={() => onItemStatusChange(item.id, 'preparing')}
                     className="btn btn-primary btn-sm"
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: 'var(--warning)' }}
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', background: 'var(--warning)', fontWeight: 700 }}
                   >
-                    Start Cooking
+                    🔥 Start Cooking
                   </button>
                 )}
 
@@ -165,9 +167,9 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
                   <button
                     onClick={() => onItemStatusChange(item.id, 'ready')}
                     className="btn btn-success btn-sm"
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}
                   >
-                    Mark Ready
+                    🔔 Mark Ready
                   </button>
                 )}
 
@@ -175,9 +177,9 @@ export const TicketCard = ({ order, onItemStatusChange, onPrintKOT, onOpenReject
                   <button
                     onClick={() => onItemStatusChange(item.id, 'served')}
                     className="btn btn-secondary btn-sm"
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, borderColor: 'var(--success)', color: 'var(--success)' }}
                   >
-                    Mark Served
+                    ✓ Mark Delivered
                   </button>
                 )}
 

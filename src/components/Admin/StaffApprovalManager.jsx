@@ -39,26 +39,33 @@ export const StaffApprovalManager = () => {
   }, []);
 
   const handleUpdateStatus = async (staffId, status) => {
+    setErrorMsg('');
+    setSuccessMsg('');
     try {
       await fetchAPI(`/auth/staff/${staffId}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status })
       });
+      setSuccessMsg(`✓ Staff status updated to '${status}' successfully.`);
       loadStaff();
+      setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
-      alert(err.message);
+      setErrorMsg(err.message || 'Failed to update status.');
     }
   };
 
   const handleDeleteUser = async (userId, username) => {
-    if (!window.confirm(`Are you sure you want to delete user '${username}'?`)) return;
+    setErrorMsg('');
+    setSuccessMsg('');
     try {
       await fetchAPI(`/auth/users/${userId}`, {
         method: 'DELETE'
       });
+      setSuccessMsg(`✓ Account '${username}' deleted successfully.`);
       loadStaff();
+      setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
-      alert(err.message);
+      setErrorMsg(err.message || 'Failed to delete account.');
     }
   };
 
@@ -124,7 +131,7 @@ export const StaffApprovalManager = () => {
 
         <button onClick={() => setIsAddUserOpen(!isAddUserOpen)} className="btn btn-primary" style={{ gap: '0.4rem' }}>
           <UserPlus size={16} />
-          <span>Add Admin / Staff</span>
+          <span>Add Staff</span>
         </button>
       </div>
 
@@ -134,7 +141,7 @@ export const StaffApprovalManager = () => {
       {/* Add User Form Drawer/Modal */}
       {isAddUserOpen && (
         <div className="glass-card animate-slide-up" style={{ padding: '1.25rem', marginBottom: '1.5rem', background: 'var(--bg-surface-elevated)', border: '1px solid var(--brand-primary)' }}>
-          <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Add New Admin or Staff User</h3>
+          <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Add New Staff</h3>
 
           <form onSubmit={handleCreateUserSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'end' }}>
             <div>

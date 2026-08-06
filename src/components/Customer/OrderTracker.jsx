@@ -100,12 +100,12 @@ export const OrderTracker = ({ order, isOpen, onClose, onOpenRating, onUpdateOrd
             </div>
 
             <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--brand-primary)', marginTop: '0.2rem' }}>
-              {formatCurrency(order.net_amount)} ({order.payment_mode.toUpperCase()})
+              {formatCurrency(order.net_amount || order.total_amount)} ({(order.payment_mode || 'cash').toUpperCase()})
             </div>
           </div>
           <div>
             <span className="badge badge-dinein" style={{ fontSize: '0.85rem' }}>
-              Status: {order.status.toUpperCase()}
+              Status: {(order.status || 'active').toUpperCase()}
             </span>
           </div>
         </div>

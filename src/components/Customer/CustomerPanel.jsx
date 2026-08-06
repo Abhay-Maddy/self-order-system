@@ -6,6 +6,7 @@ import { ItemCustomizationModal } from './ItemCustomizationModal';
 import { CartDrawer } from './CartDrawer';
 import { CheckoutModal } from './CheckoutModal';
 import { OrderTracker } from './OrderTracker';
+import { OrderStatusBar } from './OrderStatusBar';
 import { GoogleReviewModal } from './GoogleReviewModal';
 import { OrderHistoryModal } from './OrderHistoryModal';
 import { AamantranSplash } from './AamantranSplash';
@@ -17,6 +18,9 @@ import { formatCurrency, formatTime } from '../../utils/formatters';
 import { fetchAPI } from '../../utils/api';
 import { SocketContext } from '../../context/SocketContext';
 import { AuthContext } from '../../context/AuthContext';
+import { safeStorage, safeSessionStorage } from '../../utils/storage';
+import { PageSkeleton } from '../Common/PageSkeleton';
+
 
 export const CustomerPanel = () => {
   const { socket, joinRoom } = useContext(SocketContext);
@@ -65,11 +69,11 @@ export const CustomerPanel = () => {
     const tableParam = params.get('table');
     if (tableParam) {
       const cleanTable = tableParam.toUpperCase();
-      const storedScannedTable = sessionStorage.getItem('scanned_table_qr');
+      const storedScannedTable = safeSessionStorage.getItem('scanned_table_qr');
 
       if (!storedScannedTable) {
         // Initial physical QR scan -> lock table session
-        sessionStorage.setItem('scanned_table_qr', cleanTable);
+        safeSessionStorage.setItem('scanned_table_qr', cleanTable);
         setSelectedTable(cleanTable);
       } else if (storedScannedTable !== cleanTable) {
         // URL tampering detected! Revert to original scanned table
@@ -106,7 +110,7 @@ export const CustomerPanel = () => {
 
   // Restore active order from localStorage on mount / reload
   useEffect(() => {
-    const savedOrderId = localStorage.getItem('aamantran_last_order_id');
+    const savedOrderId = safeStorage.getItem('aamantran_last_order_id');
     if (savedOrderId) {
       fetchAPI(`/orders/track/${savedOrderId}`)
         .then(order => {
@@ -181,7 +185,7 @@ export const CustomerPanel = () => {
 
     setActiveOrder(createdOrder);
     if (createdOrder && createdOrder.id) {
-      localStorage.setItem('aamantran_last_order_id', createdOrder.id);
+      safeStorage.setItem('aamantran_last_order_id', createdOrder.id);
     }
     setCart([]);
     setAppliedCoupon(null);
@@ -250,6 +254,12 @@ export const CustomerPanel = () => {
           }}
         />
 
+        {/* Inline Active Order Status Bar — Top of Menu Section */}
+        <OrderStatusBar
+          activeOrder={activeOrder}
+          onOpenOrderTracker={() => setIsOrderTrackerOpen(true)}
+        />
+
         {isLoadingMenu ? (
           <PageSkeleton title="Loading Digital Menu..." />
         ) : (
@@ -265,6 +275,22 @@ export const CustomerPanel = () => {
             <MenuGrid
               items={filteredItems}
               onSelectItem={(item) => setSelectedItemForModal(item)}
+              onDirectAddToCart={(item) => {
+                handleAddToCart({
+                  item_id: item.id,
+                  item_name: item.name,
+                  image_url: item.image_url,
+                  variant_name: null,
+                  variant_price_modifier: 0,
+                  spice_level: item.spice_level || 'medium',
+                  toppings_summary: null,
+                  toppings_price: 0,
+                  fulfillment_type: 'dine_in',
+                  quantity: 1,
+                  unit_price: Number(item.price),
+                  total_price: Number(item.price)
+                });
+              }}
             />
           </>
         )}
@@ -385,7 +411,7 @@ export const CustomerPanel = () => {
                   <span>₹{(activeOrder.net_amount || 0).toFixed(2)}</span>
                 </div>
                 <div style={{ marginTop: '0.35rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
-                  Payment: {activeOrder.payment_mode.toUpperCase()} ({activeOrder.payment_status.toUpperCase()})
+                  Payment: {(activeOrder.payment_mode || 'cash').toUpperCase()} ({(activeOrder.payment_status || 'pending').toUpperCase()})
                 </div>
               </div>
 

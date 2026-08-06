@@ -9,21 +9,22 @@ export const LangToggle = () => {
     <button
       onClick={() => setLang(isHindi ? 'en' : 'hi')}
       className="btn btn-secondary btn-sm"
-      title={isHindi ? 'Switch to English' : 'हिन्दी में बदलें'}
+      title={isHindi ? 'Switch to English' : 'हिन्दी में बदलें (Translate to Hindi)'}
       style={{
-        fontSize: '0.78rem',
-        gap: '0.35rem',
-        fontWeight: 700,
-        padding: '0.4rem 0.75rem',
+        fontSize: '0.8rem',
+        gap: '0.4rem',
+        fontWeight: 800,
+        padding: '0.4rem 0.85rem',
         borderRadius: '20px',
         border: '1.5px solid var(--brand-primary)',
+        background: isHindi ? 'rgba(249, 115, 22, 0.15)' : 'var(--bg-surface-elevated)',
         color: 'var(--brand-primary)',
         letterSpacing: '0.02em',
-        transition: 'all 0.2s ease'
+        transition: 'all 0.2s ease',
+        cursor: 'pointer'
       }}
     >
-      <span style={{ fontSize: '1rem', lineHeight: 1 }}>{isHindi ? '🇮🇳' : '🇬🇧'}</span>
-      <span>{isHindi ? 'हिन्दी' : 'EN'}</span>
+      <span>{isHindi ? '🇮🇳 हिन्दी (HI)' : '🇬🇧 EN / हिन्दी'}</span>
     </button>
   );
 };

@@ -1,179 +1,163 @@
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 
 export const LanguageContext = createContext();
 
-const translations = {
+// Static fallback dictionary for immediate UI speed
+const staticDictionary = {
   en: {
-    // Branding
-    brandName: 'Aamantran',
-    brandSub: 'Self-Ordering Platform',
-    // Navigation
     customerMenu: 'Customer Menu',
     kitchenPass: 'Kitchen Pass',
     adminPortal: 'Admin Portal',
-    staffLogin: 'Staff Login',
-    logout: 'Logout',
-    // Menu
-    welcome: 'Welcome to Aamantran',
-    menu: 'Menu',
-    allItems: 'All Items',
-    searchPlaceholder: 'Search dishes, starters...',
+    searchPlaceholder: 'Search for delicious momos, rolls, shakes...',
     vegOnly: 'Veg Only',
-    nonVeg: 'Non-Veg',
-    // Cart
-    cart: 'Your Cart',
-    yourCart: 'Your Cart',
-    addToCart: 'Add to Cart',
-    add: 'Add +',
     customise: 'Customise',
-    emptyCart: 'Your cart is empty',
-    // Order
+    add: 'Add',
+    cart: 'Cart',
+    viewCart: 'View Cart',
     checkout: 'Checkout',
-    placeOrder: 'Place Order',
-    orderTracking: 'Live Order Tracker',
-    orderHistory: 'Order History',
-    trackOrder: 'Track Active Order',
-    // Table
     table: 'Table',
-    switchTable: 'Switch Table',
-    selectTable: 'Select Table Number',
-    // Payment
+    total: 'Total',
     subtotal: 'Subtotal',
-    tax: 'GST Tax',
+    tax: 'GST Tax (5%)',
     discount: 'Discount',
     grandTotal: 'Grand Total',
-    applyCoupon: 'Apply Coupon',
-    couponPlaceholder: 'Enter coupon (e.g. WELCOME10)',
-    selectPayment: 'Select Payment Method',
-    payOnline: 'Pay Online (UPI / Card)',
-    payCash: 'Cash at Counter',
-    // Dining type
+    placeOrder: 'Place Order',
+    payCash: 'Pay Cash',
+    onlinePayment: 'Online Payment',
     dineIn: 'Dine-In',
-    packing: 'Packing / Takeaway',
-    // Status
-    pending: 'Pending',
-    preparing: 'Preparing',
-    ready: 'Ready',
-    served: 'Served',
-    // Reviews
-    leaveReview: 'Rate Your Meal',
-    reviewOnGoogle: 'Share on Google Maps',
-    // Staff Panels
-    kitchen: 'Kitchen Display',
-    admin: 'Admin Dashboard',
-    // Category labels (common)
-    starters: 'Starters & Appetizers',
-    mainCourse: 'Main Course',
-    beverages: 'Beverages',
-    desserts: 'Desserts',
-    // Misc
-    spiceLevel: 'Spice Level',
-    mild: 'Mild',
-    medium: 'Medium',
-    hot: 'Hot',
-    veryHot: 'Very Hot',
-    noItems: 'No items found',
-    loading: 'Loading...',
-    close: 'Close',
-    cancel: 'Cancel',
-    save: 'Save',
-    edit: 'Edit',
-    delete: 'Delete',
-    confirm: 'Confirm',
-    yes: 'Yes',
-    no: 'No'
+    packing: 'Packing',
+    kitchen: 'Kitchen',
+    dashboard: 'Dashboard',
+    admin: 'Admin',
+    customer: 'Customer',
+    aamantran: 'Aamantran'
   },
   hi: {
-    // Branding
-    brandName: 'आमंत्रण',
-    brandSub: 'स्व-ऑर्डरिंग प्लेटफ़ॉर्म',
-    // Navigation
     customerMenu: 'ग्राहक मेन्यू',
     kitchenPass: 'रसोई पास',
-    adminPortal: 'प्रशासन पोर्टल',
-    staffLogin: 'स्टाफ लॉगिन',
-    logout: 'लॉगआउट',
-    // Menu
-    welcome: 'आमंत्रण में आपका स्वागत है',
-    menu: 'मेन्यू',
-    allItems: 'सभी व्यंजन',
-    searchPlaceholder: 'व्यंजन खोजें...',
+    adminPortal: 'एडमिन पोर्टल',
+    searchPlaceholder: 'स्वादिष्ट मोमोज, रोल, शेक खोजें...',
     vegOnly: 'केवल शाकाहारी',
-    nonVeg: 'मांसाहारी',
-    // Cart
-    cart: 'आपकी कार्ट',
-    yourCart: 'आपकी कार्ट',
-    addToCart: 'कार्ट में जोड़ें',
-    add: 'जोड़ें +',
-    customise: 'अनुकूलित करें',
-    emptyCart: 'आपकी कार्ट खाली है',
-    // Order
+    customise: 'कस्टमाइज़',
+    add: 'जोड़ें',
+    cart: 'कार्ट',
+    viewCart: 'कार्ट देखें',
     checkout: 'चेकआउट',
-    placeOrder: 'ऑर्डर दें',
-    orderTracking: 'लाइव ऑर्डर ट्रैकर',
-    orderHistory: 'ऑर्डर इतिहास',
-    trackOrder: 'सक्रिय ऑर्डर ट्रैक करें',
-    // Table
     table: 'टेबल',
-    switchTable: 'टेबल बदलें',
-    selectTable: 'टेबल नंबर चुनें',
-    // Payment
-    subtotal: 'उप-योग',
-    tax: 'जीएसटी कर',
+    total: 'कुल',
+    subtotal: 'उप-कुल',
+    tax: 'जीएसटी कर (5%)',
     discount: 'छूट',
     grandTotal: 'कुल राशि',
-    applyCoupon: 'कूपन लागू करें',
-    couponPlaceholder: 'कूपन दर्ज करें (जैसे WELCOME10)',
-    selectPayment: 'भुगतान का तरीका चुनें',
-    payOnline: 'ऑनलाइन भुगतान (UPI / कार्ड)',
-    payCash: 'काउंटर पर नकद',
-    // Dining type
-    dineIn: 'यहाँ खाएं',
-    packing: 'पैकिंग / टेकअवे',
-    // Status
-    pending: 'प्रतीक्षित',
-    preparing: 'तैयार हो रहा है',
-    ready: 'तैयार',
-    served: 'परोसा गया',
-    // Reviews
-    leaveReview: 'अपने भोजन को रेट करें',
-    reviewOnGoogle: 'Google मैप्स पर साझा करें',
-    // Staff Panels
-    kitchen: 'रसोई डिस्प्ले',
-    admin: 'प्रशासन डैशबोर्ड',
-    // Category labels
-    starters: 'स्टार्टर्स और स्नैक्स',
-    mainCourse: 'मुख्य व्यंजन',
-    beverages: 'पेय पदार्थ',
-    desserts: 'मिठाई',
-    // Misc
-    spiceLevel: 'मसाला स्तर',
-    mild: 'हल्का',
-    medium: 'मध्यम',
-    hot: 'तीखा',
-    veryHot: 'बहुत तीखा',
-    noItems: 'कोई व्यंजन नहीं मिला',
-    loading: 'लोड हो रहा है...',
-    close: 'बंद करें',
-    cancel: 'रद्द करें',
-    save: 'सहेजें',
-    edit: 'संपादित करें',
-    delete: 'हटाएं',
-    confirm: 'पुष्टि करें',
-    yes: 'हाँ',
-    no: 'नहीं'
+    placeOrder: 'ऑर्डर दें',
+    payCash: 'नकद भुगतान',
+    onlinePayment: 'ऑनलाइन भुगतान',
+    dineIn: 'डाइन-इन (हॉल)',
+    packing: 'पैकिंग (टेकअवे)',
+    kitchen: 'रसोई',
+    dashboard: 'डैशबोर्ड',
+    admin: 'एडमिन',
+    customer: 'ग्राहक',
+    aamantran: 'आमंत्रण'
   }
 };
 
+// Common dish term mapping for instant Hindi transliteration
+const commonTermsMap = {
+  'aamantran': 'आमंत्रण',
+  'momos': 'मोमोज',
+  'momo': 'मोमो',
+  'paneer': 'पनीर',
+  'chicken': 'चिकन',
+  'crispy': 'क्रिस्पी',
+  'fried': 'फ्राइड',
+  'steamed': 'स्टीम्ड',
+  'roll': 'रोल',
+  'rolls': 'रोल्स',
+  'burger': 'बर्गर',
+  'pizza': 'पिज्जा',
+  'chowmein': 'चौमीन',
+  'noodles': 'नूडल्स',
+  'manchurian': 'मंचूरियन',
+  'shake': 'शेक',
+  'coca cola': 'कोका कोला',
+  'coke': 'कोक',
+  'pepsi': 'पेप्सी',
+  'coffee': 'कॉफी',
+  'tea': 'चाय',
+  'chai': 'चाय',
+  'butter': 'मक्खन',
+  'tikka': 'टिक्का',
+  'masala': 'मसाला',
+  'gravy': 'ग्रेवी',
+  'dry': 'ड्राय',
+  'soup': 'सूप',
+  'dashboard': 'डैशबोर्ड',
+  'kitchen': 'रसोई',
+  'admin': 'एडमिन',
+  'customer': 'ग्राहक',
+  'menu': 'मेन्यू',
+  'order': 'ऑर्डर'
+};
+
+const translationCache = {};
+
 export const LanguageProvider = ({ children }) => {
-  const [lang, setLang] = useState('en');
+  const [lang, setLang] = useState(() => localStorage.getItem('aamantran_lang') || 'en');
+
+  useEffect(() => {
+    localStorage.setItem('aamantran_lang', lang);
+  }, [lang]);
 
   const t = (key) => {
-    return translations[lang]?.[key] || translations['en']?.[key] || key;
+    if (staticDictionary[lang] && staticDictionary[lang][key]) {
+      return staticDictionary[lang][key];
+    }
+    return key;
   };
 
+  // Dynamic Google Translator API fetch for dishes & arbitrary text
+  const translateDynamicText = useCallback(async (text) => {
+    if (!text || typeof text !== 'string') return text;
+    if (lang === 'en') return text; // Default English
+
+    const cacheKey = `${lang}:${text.toLowerCase().trim()}`;
+    if (translationCache[cacheKey]) {
+      return translationCache[cacheKey];
+    }
+
+    // Check fast term mapping
+    let words = text.split(' ');
+    let mappedWords = words.map(w => {
+      let clean = w.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return commonTermsMap[clean] || w;
+    });
+    
+    // If all words mapped locally, return immediately
+    let localResult = mappedWords.join(' ');
+    if (localResult !== text) {
+      translationCache[cacheKey] = localResult;
+    }
+
+    try {
+      // Call Google Translate free API endpoint
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=hi&dt=t&q=${encodeURIComponent(text)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data[0] && data[0][0] && data[0][0][0]) {
+        const translated = data[0][0][0];
+        translationCache[cacheKey] = translated;
+        return translated;
+      }
+    } catch (e) {
+      console.warn('Google Translate API error, falling back to local dictionary:', e);
+    }
+
+    return translationCache[cacheKey] || text;
+  }, [lang]);
+
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>
+    <LanguageContext.Provider value={{ lang, setLang, t, translateDynamicText }}>
       {children}
     </LanguageContext.Provider>
   );

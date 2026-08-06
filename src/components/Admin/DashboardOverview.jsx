@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchAPI } from '../../utils/api';
-import { formatCurrency, formatTime } from '../../utils/formatters';
+import { formatCurrency, formatTime, getTodayDateString } from '../../utils/formatters';
 import { Modal } from '../Common/Modal';
 import { DollarSign, ShoppingBag, Clock, Flame, Star, Printer, CheckCircle, RefreshCw, Calendar } from 'lucide-react';
 
@@ -8,7 +8,7 @@ export const DashboardOverview = () => {
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => getTodayDateString());
   const [printingOrder, setPrintingOrder] = useState(null);
 
   const loadData = () => {
@@ -25,6 +25,14 @@ export const DashboardOverview = () => {
 
   useEffect(() => {
     loadData();
+
+    // Auto-detect system date change (midnight rollover)
+    const interval = setInterval(() => {
+      const currentToday = getTodayDateString();
+      setSelectedDate(prev => (prev !== currentToday ? currentToday : prev));
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [selectedDate]);
 
   const handleVerifyPayment = async (orderId) => {
@@ -221,46 +229,77 @@ export const DashboardOverview = () => {
 
       {/* PRINT BILL MODAL */}
       {printingOrder && (
-        <Modal isOpen={Boolean(printingOrder)} onClose={() => setPrintingOrder(null)} title={`Customer Bill #${printingOrder.order_number}`}>
-          <div>
-            {/* Top Close / Cut Action Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--bg-surface-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                🖨️ Tax Invoice & Bill Preview
-              </span>
-              <button
-                onClick={() => setPrintingOrder(null)}
-                className="btn btn-danger btn-sm"
-                style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
-                title="Close Bill View"
-              >
-                <span>✖ Cut / Close Bill</span>
-              </button>
-            </div>
-
-            <div id="printable-bill" style={{ background: '#fff', color: '#000', padding: '1.5rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-              <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 900 }}>AAMANTRAN RESTAURANT</h3>
-                <div>Self-Ordering System • Table #{printingOrder.table_number}</div>
-                <div>Date: {new Date(printingOrder.created_at).toLocaleString()}</div>
-                <div>Order Ref: #{printingOrder.order_number}</div>
+        <Modal isOpen={Boolean(printingOrder)} onClose={() => setPrintingOrder(null)} title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+            <span>Tax Invoice &amp; Bill #{printingOrder.order_number}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); window.print(); }}
+              className="btn btn-secondary btn-sm"
+              style={{
+                padding: '0.35rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: 'auto',
+                transition: 'all 0.2s ease',
+                color: 'var(--brand-primary)',
+                borderColor: 'var(--brand-primary)'
+              }}
+              title="Print this bill"
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--brand-primary)'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--brand-primary)'; }}
+            >
+              <Printer size={16} />
+            </button>
+          </div>
+        }>
+          <div
+              id="printable-bill"
+              style={{
+                background: '#ffffff',
+                color: '#0f172a',
+                padding: '1.75rem 1.5rem',
+                borderRadius: '12px',
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: '0.85rem',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                border: '1px solid #cbd5e1'
+              }}
+            >
+              {/* Restaurant Branding Header */}
+              <div style={{ textAlign: 'center', borderBottom: '2px dashed #334155', paddingBottom: '0.85rem', marginBottom: '0.85rem' }}>
+                <h2 style={{ fontSize: '1.35rem', margin: '0 0 0.25rem 0', fontWeight: 900, color: '#0f172a', letterSpacing: '1px' }}>
+                  AAMANTRAN FINE DINING BISTRO
+                </h2>
+                <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                  QR Self-Ordering & Kitchen Management Platform
+                </div>
+                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#1e293b' }}>
+                  <b>Table: #{printingOrder.table_number}</b> • Ref: <b>#{printingOrder.order_number}</b>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  Date & Time: {new Date(printingOrder.created_at).toLocaleString()}
+                </div>
               </div>
 
-              <table style={{ width: '100%', marginBottom: '0.75rem', borderCollapse: 'collapse' }}>
+              {/* Items Table */}
+              <table style={{ width: '100%', marginBottom: '0.85rem', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>
-                    <th style={{ padding: '0.3rem 0' }}>Qty & Item</th>
-                    <th style={{ padding: '0.3rem 0', textAlign: 'right' }}>Price</th>
+                  <tr style={{ borderBottom: '1.5px solid #0f172a', textAlign: 'left', color: '#0f172a', fontWeight: 800 }}>
+                    <th style={{ padding: '0.4rem 0' }}>Qty & Item</th>
+                    <th style={{ padding: '0.4rem 0', textAlign: 'right' }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(printingOrder.items || []).map((it, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px dotted #ccc' }}>
-                      <td style={{ padding: '0.3rem 0' }}>
-                        {it.quantity}x {it.item_name}
-                        {it.fulfillment_type === 'packing' && ' [PACKING]'}
+                    <tr key={idx} style={{ borderBottom: '1px dotted #cbd5e1' }}>
+                      <td style={{ padding: '0.4rem 0', color: '#1e293b' }}>
+                        <b>{it.quantity}x</b> {it.item_name}
+                        {it.variant_name && <span style={{ fontSize: '0.75rem', color: '#475569' }}> ({it.variant_name})</span>}
+                        {it.fulfillment_type === 'packing' && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#d97706' }}> [TAKEAWAY / PACKING]</span>}
                       </td>
-                      <td style={{ padding: '0.3rem 0', textAlign: 'right' }}>
+                      <td style={{ padding: '0.4rem 0', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                         ₹{(it.total_price || 0).toFixed(2)}
                       </td>
                     </tr>
@@ -268,50 +307,54 @@ export const DashboardOverview = () => {
                 </tbody>
               </table>
 
-              <div style={{ borderTop: '1px dashed #000', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              {/* Financial Calculation Summary */}
+              <div style={{ borderTop: '1.5px dashed #334155', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
                   <span>Subtotal:</span>
                   <span>₹{(printingOrder.total_amount || 0).toFixed(2)}</span>
                 </div>
                 {printingOrder.discount_amount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Discount:</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontWeight: 700 }}>
+                    <span>Coupon Discount:</span>
                     <span>-₹{(printingOrder.discount_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
                   <span>GST Tax (5%):</span>
                   <span>₹{(printingOrder.tax_amount || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '1rem', borderTop: '1px solid #000', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                <div style={{
+                  display: 'flex',
+                  justify: 'space-between',
+                  fontWeight: 900,
+                  fontSize: '1.1rem',
+                  borderTop: '2px solid #0f172a',
+                  paddingTop: '0.5rem',
+                  marginTop: '0.25rem',
+                  color: '#0f172a'
+                }}>
                   <span>GRAND TOTAL:</span>
                   <span>₹{(printingOrder.net_amount || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ marginTop: '0.4rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
-                  Payment: {printingOrder.payment_mode.toUpperCase()} ({printingOrder.payment_status.toUpperCase()})
+                <div style={{
+                  marginTop: '0.5rem',
+                  textAlign: 'center',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  padding: '0.3rem',
+                  background: '#f1f5f9',
+                  borderRadius: '6px',
+                  color: printingOrder.payment_status === 'completed' ? '#16a34a' : '#dc2626'
+                }}>
+                  Payment: {(printingOrder.payment_mode || 'cash').toUpperCase()} ({printingOrder.payment_status === 'completed' ? 'PAID ✓' : 'UNPAID'})
                 </div>
               </div>
 
-              <div style={{ textAlign: 'center', marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px dashed #000', fontSize: '0.75rem' }}>
-                Thank you for dining at Aamantran! Have a wonderful day!
+              {/* Receipt Footer */}
+              <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '0.6rem', borderTop: '1px dashed #94a3b8', fontSize: '0.78rem', color: '#475569' }}>
+                ❤️ Thank you for dining at Aamantran Bistro! Please visit us again!
               </div>
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
-              <button onClick={() => setPrintingOrder(null)} className="btn btn-danger" style={{ padding: '0.5rem 1rem' }}>
-                ✖ Close / Cancel
-              </button>
-              <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="btn btn-primary"
-                style={{ gap: '0.4rem' }}
-              >
-                <Printer size={16} /> Print Bill Now
-              </button>
-            </div>
-          </div>
         </Modal>
       )}
 

@@ -112,59 +112,67 @@ export const CartDrawer = ({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {cart.map(item => (
-                <div key={item.cart_id} className="glass-card" style={{ padding: '0.9rem', position: 'relative' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                    <h4 style={{ fontSize: '0.95rem' }}>{item.item_name}</h4>
-                    <span style={{ fontWeight: 800, color: 'var(--brand-primary)' }}>
-                      {formatCurrency(item.total_price)}
-                    </span>
-                  </div>
+              {cart.map(item => {
+                const itemName = item.item_name || item.name || (item.item && item.item.name) || 'Dish';
+                const itemPrice = (typeof item.total_price === 'number' && !isNaN(item.total_price) && item.total_price > 0)
+                  ? item.total_price
+                  : ((item.unit_price || item.price || 0) * (item.quantity || 1));
+                const fulfillment = item.fulfillment_type || 'dine_in';
 
-                  {item.variant_name && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      Variant: {item.variant_name}
+                return (
+                  <div key={item.cart_id || item.id} className="glass-card" style={{ padding: '0.9rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>{itemName}</h4>
+                      <span style={{ fontWeight: 800, color: 'var(--brand-primary)' }}>
+                        {formatCurrency(itemPrice)}
+                      </span>
                     </div>
-                  )}
 
-                  {item.toppings_summary && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      Toppings: {item.toppings_summary}
-                    </div>
-                  )}
+                    {item.variant_name && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        Variant: {item.variant_name}
+                      </div>
+                    )}
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem' }}>
-                    {/* Per-item Fulfillment Toggle */}
-                    <button
-                      onClick={() => toggleItemFulfillment(item.cart_id)}
-                      className={`badge ${item.fulfillment_type === 'dine_in' ? 'badge-dinein' : 'badge-packing'}`}
-                      style={{ border: 'none', cursor: 'pointer' }}
-                      title="Click to toggle Dine-In vs Packing for this item"
-                    >
-                      {item.fulfillment_type === 'dine_in' ? '🍽️ Dine-In' : '📦 Packing'}
-                    </button>
+                    {item.toppings_summary && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        Toppings: {item.toppings_summary}
+                      </div>
+                    )}
 
-                    {/* Quantity Adjustment */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-surface-elevated)', padding: '0.15rem 0.4rem', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem' }}>
+                      {/* Per-item Fulfillment Toggle */}
                       <button
-                        onClick={() => updateQuantity(item.cart_id, -1)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ width: '24px', height: '24px', padding: 0 }}
+                        onClick={() => toggleItemFulfillment(item.cart_id)}
+                        className={`badge ${fulfillment === 'dine_in' ? 'badge-dinein' : 'badge-packing'}`}
+                        style={{ border: 'none', cursor: 'pointer' }}
+                        title="Click to toggle Dine-In vs Packing for this item"
                       >
-                        -
+                        {fulfillment === 'dine_in' ? '🍽️ Dine-In' : '📦 Packing'}
                       </button>
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.cart_id, 1)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ width: '24px', height: '24px', padding: 0 }}
-                      >
-                        +
-                      </button>
+
+                      {/* Quantity Adjustment */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-surface-elevated)', padding: '0.15rem 0.4rem', borderRadius: '6px' }}>
+                        <button
+                          onClick={() => updateQuantity(item.cart_id, -1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ width: '24px', height: '24px', padding: 0 }}
+                        >
+                          -
+                        </button>
+                        <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.cart_id, 1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ width: '24px', height: '24px', padding: 0 }}
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

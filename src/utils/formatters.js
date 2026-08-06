@@ -16,3 +16,11 @@ export const formatDuration = (startTime) => {
   const diffMinutes = Math.floor((now - start) / (1000 * 60));
   return `${diffMinutes}m`;
 };
+
+export const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};

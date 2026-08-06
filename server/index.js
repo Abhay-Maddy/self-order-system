@@ -53,6 +53,17 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
 
+// Global JSON Error Handler for API routes
+app.use((err, req, res, next) => {
+  console.error('API Server Error:', err);
+  if (req.path.startsWith('/api')) {
+    return res.status(err.status || 500).json({
+      error: err.message || 'Internal Server Error'
+    });
+  }
+  next(err);
+});
+
 // Serve static frontend build from dist folder
 const distPath = path.join(__dirname, '../dist');
 const distIndexPath = path.join(distPath, 'index.html');

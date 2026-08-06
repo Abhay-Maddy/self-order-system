@@ -3,7 +3,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { LanguageContext } from '../../context/LanguageContext';
 import { Plus, Flame, AlertCircle } from 'lucide-react';
 
-export const MenuGrid = ({ items, onSelectItem }) => {
+export const MenuGrid = ({ items, onSelectItem, onDirectAddToCart }) => {
   const { t } = useContext(LanguageContext);
 
   if (!items || items.length === 0) {
@@ -23,6 +23,7 @@ export const MenuGrid = ({ items, onSelectItem }) => {
       {items.map(item => {
         const isOutOfStock = item.stock_quantity <= 0;
         const isLowStock = item.stock_quantity > 0 && item.stock_quantity <= item.low_stock_threshold;
+        const hasCustomization = Number(item.has_customization) === 1 || (item.variants && item.variants.length > 0);
 
         return (
           <div
@@ -46,9 +47,11 @@ export const MenuGrid = ({ items, onSelectItem }) => {
               />
 
               <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span className={`badge ${item.is_veg ? 'badge-veg' : 'badge-nonveg'}`}>
-                  {item.is_veg ? 'VEG' : 'NON-VEG'}
-                </span>
+                {item.is_veg !== null && item.is_veg !== undefined && item.is_veg !== '' && (
+                  <span className={`badge ${Number(item.is_veg) === 1 ? 'badge-veg' : 'badge-nonveg'}`}>
+                    {Number(item.is_veg) === 1 ? 'VEG' : 'NON-VEG'}
+                  </span>
+                )}
                 {item.spice_level === 'hot' && (
                   <span className="badge" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger)' }}>
                     <Flame size={12} /> Spicy
@@ -82,7 +85,7 @@ export const MenuGrid = ({ items, onSelectItem }) => {
                     {item.subtitle}
                   </div>
                 )}
-                {item.tags && (
+                {typeof item.tags === 'string' && item.tags.trim() && (
                   <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
                     {item.tags.split(',').map((t, idx) => (
                       <span key={idx} className="badge" style={{ background: 'var(--bg-surface-elevated)', color: 'var(--text-primary)', fontSize: '0.7rem' }}>
@@ -111,11 +114,19 @@ export const MenuGrid = ({ items, onSelectItem }) => {
 
                   <button
                     disabled={isOutOfStock}
-                    onClick={() => onSelectItem(item)}
+                    onClick={() => {
+                      if (hasCustomization) {
+                        onSelectItem(item);
+                      } else if (onDirectAddToCart) {
+                        onDirectAddToCart(item);
+                      } else {
+                        onSelectItem(item);
+                      }
+                    }}
                     className="btn btn-primary btn-sm"
                     style={{ gap: '0.3rem' }}
                   >
-                    <span>{item.variants && item.variants.length > 0 ? t('customise') : t('add')}</span>
+                    <span>{hasCustomization ? t('customise') : t('add')}</span>
                     <Plus size={16} />
                   </button>
                 </div>

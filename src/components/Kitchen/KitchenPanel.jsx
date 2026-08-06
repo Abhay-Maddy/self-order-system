@@ -10,6 +10,7 @@ import { playKitchenChime } from '../../utils/sound';
 import { PageSkeleton } from '../Common/PageSkeleton';
 import { StaffLoginView } from '../Common/StaffLoginView';
 import { ChefHat } from 'lucide-react';
+import { getTodayDateString } from '../../utils/formatters';
 
 export const KitchenPanel = () => {
   const { user } = useContext(AuthContext);
@@ -22,14 +23,15 @@ export const KitchenPanel = () => {
   const [rejectingItem, setRejectingItem] = useState(null);
   const [printingOrder, setPrintingOrder] = useState(null);
 
-  // K7 Controls
+  // Controls & Date Filter
   const [tableFilter, setTableFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('oldest');
+  const [selectedDate, setSelectedDate] = useState(() => getTodayDateString());
 
-  // Load Active Kitchen Orders
+  // Load Kitchen Orders for Selected Date
   const loadActiveOrders = useCallback(() => {
     setLoading(true);
-    fetchAPI('/orders/kitchen')
+    fetchAPI(`/orders/kitchen?date=${selectedDate}`)
       .then(data => {
         setOrders(data || []);
       })
@@ -46,7 +48,7 @@ export const KitchenPanel = () => {
         setLowStockItems(low);
       })
       .catch(err => console.error('Failed to load inventory:', err));
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     if (user) {
@@ -77,21 +79,26 @@ export const KitchenPanel = () => {
 
     socket.on('new_order', handleNewOrder);
     socket.on('order_updated', handleOrderUpdated);
+    socket.on('item_status_updated', handleOrderUpdated);
 
     return () => {
       socket.off('new_order', handleNewOrder);
       socket.off('order_updated', handleOrderUpdated);
+      socket.off('item_status_updated', handleOrderUpdated);
     };
   }, [socket, user, joinRoom]);
 
-  // Handle Item Status Change (K4, K5, K6)
-  const handleItemStatusChange = async (itemId, newStatus, rejectionReason = null) => {
+  // Handle Item Status Change (Accept, Cooking, Ready, Served, Reject)
+  const handleItemStatusChange = async (itemId, newStatus, rejectionReason = null, prepMins = null) => {
     try {
       await fetchAPI(`/orders/items/${itemId}/status`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: newStatus, rejection_reason: rejectionReason })
+        body: JSON.stringify({
+          status: newStatus,
+          rejection_reason: rejectionReason,
+          prep_time_minutes: prepMins
+        })
       });
-      // Refresh local order list
       loadActiveOrders();
     } catch (err) {
       alert(`Failed to update item status: ${err.message}`);
@@ -103,7 +110,7 @@ export const KitchenPanel = () => {
     return <StaffLoginView defaultRole="chef" />;
   }
 
-  // Filter & Sort orders (K7)
+  // Filter & Sort orders
   let processedOrders = [...orders];
   if (tableFilter !== 'all') {
     processedOrders = processedOrders.filter(o => o.table_number === tableFilter);
@@ -117,7 +124,7 @@ export const KitchenPanel = () => {
   // Filter orders by active kitchen status
   const pendingOrders = processedOrders.filter(o => o.items && o.items.some(i => i.status === 'pending'));
   const preparingOrders = processedOrders.filter(o => o.items && o.items.some(i => i.status === 'preparing' || i.status === 'accepted'));
-  const readyOrders = processedOrders.filter(o => o.items && o.items.some(i => i.status === 'ready'));
+  const readyOrders = processedOrders.filter(o => o.items && o.items.some(i => i.status === 'ready' || i.status === 'served'));
 
   return (
     <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
@@ -129,6 +136,8 @@ export const KitchenPanel = () => {
         setTableFilter={setTableFilter}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
         tables={tables}
         lowStockItems={lowStockItems}
       />
@@ -176,7 +185,7 @@ export const KitchenPanel = () => {
             ))}
           </div>
 
-          {/* Column 3: Ready to Serve */}
+          {/* Column 3: Ready to Pass / Delivered */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', padding: '0.5rem 0.8rem', background: 'var(--bg-surface-elevated)', borderRadius: '8px' }}>
               <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

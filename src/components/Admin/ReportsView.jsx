@@ -1,11 +1,12 @@
 import React from 'react';
 import { fetchAPI } from '../../utils/api';
+import { safeStorage } from '../../utils/storage';
 import { FileText, Download } from 'lucide-react';
 
 export const ReportsView = () => {
   const handleExportCSV = async () => {
     try {
-      const token = localStorage.getItem('staff_token');
+      const token = safeStorage.getItem('staff_token');
       const res = await fetch('/api/reports/export', {
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { playKitchenChime } from '../../utils/sound';
-import { ChefHat, Volume2, VolumeX, RefreshCw, Filter, ArrowUpDown, AlertCircle } from 'lucide-react';
+import { ChefHat, Volume2, VolumeX, RefreshCw, Filter, ArrowUpDown, AlertCircle, Calendar } from 'lucide-react';
+import { getTodayDateString } from '../../utils/formatters';
 
 export const KitchenHeader = ({
   activeCount,
@@ -10,6 +11,8 @@ export const KitchenHeader = ({
   setTableFilter,
   sortOrder,
   setSortOrder,
+  selectedDate,
+  setSelectedDate,
   tables,
   lowStockItems
 }) => {
@@ -19,9 +22,11 @@ export const KitchenHeader = ({
     playKitchenChime();
   };
 
+  const isToday = selectedDate === getTodayDateString();
+
   return (
     <div style={{ marginBottom: '1.5rem' }}>
-      {/* Low Stock Warning Alert Banner (K10 requirement) */}
+      {/* Low Stock Warning Alert Banner */}
       {lowStockItems && lowStockItems.length > 0 && (
         <div style={{
           background: 'var(--warning-bg)',
@@ -38,7 +43,7 @@ export const KitchenHeader = ({
         }}>
           <AlertCircle size={20} />
           <span>
-            <b>Low Stock Alert (K10):</b> {lowStockItems.map(i => `${i.name} (${i.stock_quantity} left)`).join(', ')}
+            <b>Low Stock Alert:</b> {lowStockItems.map(i => `${i.name} (${i.stock_quantity} left)`).join(', ')}
           </span>
         </div>
       )}
@@ -74,11 +79,33 @@ export const KitchenHeader = ({
           </div>
         </div>
 
-        {/* Filter & Sorting Control Bar (K7 requirement) */}
+        {/* Filter, Date & Sorting Control Bar */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+          {/* Date Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600 }}>
+            <Calendar size={16} className="text-brand" />
+            <span>Order Date:</span>
+            <input
+              type="date"
+              value={selectedDate || getTodayDateString()}
+              onChange={e => setSelectedDate && setSelectedDate(e.target.value)}
+              className="input-field"
+              style={{ width: 'auto', padding: '0.35rem 0.6rem', fontSize: '0.85rem' }}
+            />
+            {!isToday && (
+              <button
+                onClick={() => setSelectedDate && setSelectedDate(getTodayDateString())}
+                className="btn btn-primary btn-sm"
+                style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }}
+              >
+                Today
+              </button>
+            )}
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>
             <Filter size={16} className="text-brand" />
-            <span>Filter by Table (K7):</span>
+            <span>Filter Table:</span>
             <select
               value={tableFilter}
               onChange={e => setTableFilter(e.target.value)}
@@ -94,7 +121,7 @@ export const KitchenHeader = ({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>
             <ArrowUpDown size={16} className="text-brand" />
-            <span>Sort by Time (K7):</span>
+            <span>Sort Time:</span>
             <select
               value={sortOrder}
               onChange={e => setSortOrder(e.target.value)}

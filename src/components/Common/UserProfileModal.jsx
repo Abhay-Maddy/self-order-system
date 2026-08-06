@@ -10,6 +10,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    personal_email: '',
     username: '',
     password: ''
   });
@@ -22,6 +23,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
       setFormData({
         name: user.name || '',
         email: user.email || '',
+        personal_email: user.personal_email || '',
         username: user.username || '',
         password: ''
       });
@@ -42,14 +44,15 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
         body: JSON.stringify(formData)
       });
 
-      if (res.token) {
-        localStorage.setItem('staff_token', res.token);
+      if (res.user && res.token) {
+        login({ user: res.user, token: res.token });
       }
 
       setSuccessMsg(res.message || 'Profile updated successfully!');
       setTimeout(() => {
-        window.location.reload(); // Refresh to update context user state
-      }, 1000);
+        onClose();
+        setSuccessMsg('');
+      }, 800);
     } catch (err) {
       setErrorMsg(err.message || 'Failed to update profile.');
     } finally {
@@ -57,15 +60,16 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
     }
   };
 
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="My Profile & Account Credentials">
+    <Modal isOpen={isOpen} onClose={onClose} title="My Profile & Account Settings">
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--bg-surface-elevated)', padding: '0.8rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
           <div style={{ background: 'var(--brand-primary)', color: '#fff', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-            {user.username.charAt(0).toUpperCase()}
+            {(user.name || user.username).charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{user.name} ({user.role.toUpperCase()})</div>
+            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{user.name} ({user.role ? user.role.toUpperCase() : 'STAFF'})</div>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Logged in as: <strong>{user.username}</strong></span>
           </div>
         </div>
@@ -75,15 +79,15 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            Full Name:
+            Full Name: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
           </label>
           <div style={{ position: 'relative' }}>
             <User size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              required
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Enter full name"
               className="input-field"
               style={{ paddingLeft: '2.2rem' }}
             />
@@ -92,15 +96,15 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            Email Address:
+            System / Work Email: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
           </label>
           <div style={{ position: 'relative' }}>
             <Mail size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="email"
-              required
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
+              placeholder="work@aamantran.com"
               className="input-field"
               style={{ paddingLeft: '2.2rem' }}
             />
@@ -109,15 +113,32 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            Username (Sign-in ID):
+            Personal Email: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+          </label>
+          <div style={{ position: 'relative' }}>
+            <Mail size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="email"
+              value={formData.personal_email}
+              onChange={e => setFormData({ ...formData, personal_email: e.target.value })}
+              placeholder="personal@email.com"
+              className="input-field"
+              style={{ paddingLeft: '2.2rem' }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+            Username (Sign-in ID): <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
           </label>
           <div style={{ position: 'relative' }}>
             <Lock size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              required
               value={formData.username}
               onChange={e => setFormData({ ...formData, username: e.target.value })}
+              placeholder="Username"
               className="input-field"
               style={{ paddingLeft: '2.2rem' }}
             />
@@ -126,7 +147,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            New Password (Optional):
+            New Password: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
           </label>
           <div style={{ position: 'relative' }}>
             <Key size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />

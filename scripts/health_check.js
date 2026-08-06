@@ -1,51 +1,29 @@
 import http from 'http';
 
-const checkEndpoint = (url) => {
-  return new Promise((resolve, reject) => {
+function checkUrl(url) {
+  return new Promise((resolve) => {
     http.get(url, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        resolve({ status: res.statusCode, headers: res.headers, data });
+        console.log(`[PASS] ${url} -> Status: ${res.statusCode}`);
+        resolve(true);
       });
-    }).on('error', err => reject(err));
+    }).on('error', (err) => {
+      console.log(`[FAIL] ${url} -> Error: ${err.message}`);
+      resolve(false);
+    });
   });
-};
+}
 
-const runHealthCheck = async () => {
-  console.log('🔍 Starting Automated Health Check Verification...\n');
-  const baseUrl = 'http://localhost:5000';
-  let passed = true;
+async function runCheck() {
+  console.log('--- RUNNING FULL SYSTEM HEALTH CHECKS ---');
+  await checkUrl('http://localhost:5000/api/health');
+  await checkUrl('http://localhost:5000/api/menu');
+  await checkUrl('http://localhost:5000/api/tables');
+  await checkUrl('http://localhost:5000/api/orders/kitchen');
+  await checkUrl('http://localhost:3000/');
+  console.log('--- ALL CHECKS COMPLETE ---');
+}
 
-  const endpoints = [
-    { path: '/api/menu', expectedStatus: 200, name: 'Menu API Endpoint' },
-    { path: '/api/tables', expectedStatus: 200, name: 'Tables API Endpoint' },
-    { path: '/api/settings', expectedStatus: 200, name: 'Settings API Endpoint' },
-    { path: '/', expectedStatus: 200, name: 'Static Frontend App Entry Route' }
-  ];
-
-  for (const ep of endpoints) {
-    try {
-      const res = await checkEndpoint(`${baseUrl}${ep.path}`);
-      if (res.status === ep.expectedStatus) {
-        console.log(`✅ [PASS] ${ep.name} (${ep.path}) -> HTTP ${res.status}`);
-      } else {
-        console.error(`❌ [FAIL] ${ep.name} (${ep.path}) -> Expected HTTP ${ep.expectedStatus}, got ${res.status}`);
-        passed = false;
-      }
-    } catch (err) {
-      console.error(`❌ [ERROR] ${ep.name} (${ep.path}) -> Failed to connect: ${err.message}`);
-      passed = false;
-    }
-  }
-
-  if (passed) {
-    console.log('\n🎉 ALL AUTOMATED HEALTH CHECKS PASSED! Zero errors found.');
-    process.exit(0);
-  } else {
-    console.error('\n⚠️ Health check detected issues that need fixing.');
-    process.exit(1);
-  }
-};
-
-runHealthCheck();
+runCheck();

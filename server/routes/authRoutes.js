@@ -59,6 +59,7 @@ router.post('/login', async (req, res) => {
         id: user.id,
         username: user.username,
         email: user.email || `${user.username}@aamantran.com`,
+        personal_email: user.personal_email || '',
         name: user.name,
         role: user.role,
         is_main_admin: user.is_main_admin || 0,
@@ -71,14 +72,19 @@ router.post('/login', async (req, res) => {
 });
 
 // Get current user profile
-router.get('/me', verifyToken, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', verifyToken, async (req, res) => {
+  try {
+    const user = await getQuery('SELECT id, username, email, personal_email, name, role, is_main_admin, status FROM users WHERE id = ?', [req.user.id]);
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Admin: List all users (Admins, Chefs, Cashiers)
 router.get('/staff', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const staff = await allQuery('SELECT id, username, email, name, role, is_main_admin, status, created_at FROM users ORDER BY created_at DESC');
+    const staff = await allQuery('SELECT id, username, email, personal_email, name, role, is_main_admin, status, created_at FROM users ORDER BY created_at DESC');
     res.json(staff);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -88,7 +94,7 @@ router.get('/staff', verifyToken, requireRole(['admin']), async (req, res) => {
 // Admin: Add a new Admin, Chef, or Cashier directly
 router.post('/add-user', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { username, email, password, name, role, status = 'approved' } = req.body;
+    const { username, email, personal_email, password, name, role, status = 'approved' } = req.body;
     if (!username || !password || !name || !role) {
       return res.status(400).json({ error: 'Username, password, name, and role are required.' });
     }
@@ -106,8 +112,8 @@ router.post('/add-user', verifyToken, requireRole(['admin']), async (req, res) =
     const isMainAdmin = 0; // Only initial admin is main admin by default
 
     await runQuery(
-      `INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [username, userEmail, hash, name, role, isMainAdmin, status]
+      `INSERT INTO users (username, email, personal_email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, userEmail, personal_email || '', hash, name, role, isMainAdmin, status]
     );
 
     res.json({ message: `Successfully added new ${role}: ${name}` });
@@ -134,33 +140,41 @@ router.delete('/users/:id', verifyToken, requireRole(['admin']), async (req, res
   }
 });
 
-// User: Update own profile (Name, Email, Username, Password)
+// User: Update own profile (Name, Work Email, Personal Email, Username, Password) — All fields optional
 router.put('/profile', verifyToken, async (req, res) => {
   try {
-    const { name, email, username, password } = req.body;
+    const { name, email, personal_email, username, password } = req.body;
     const userId = req.user.id;
 
-    if (!name || !username) {
-      return res.status(400).json({ error: 'Name and Username are required.' });
+    const currentUser = await getQuery('SELECT * FROM users WHERE id = ?', [userId]);
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User account not found.' });
     }
 
-    // Check if username is taken by another user
-    const existing = await getQuery('SELECT id FROM users WHERE username = ? AND id != ?', [username, userId]);
-    if (existing) {
-      return res.status(400).json({ error: 'Username is already taken by another account.' });
+    const newName = (name && name.trim()) ? name.trim() : currentUser.name;
+    const newUsername = (username && username.trim()) ? username.trim() : currentUser.username;
+    const newEmail = email !== undefined ? email.trim() : (currentUser.email || '');
+    const newPersonalEmail = personal_email !== undefined ? personal_email.trim() : (currentUser.personal_email || '');
+
+    // Check if new username is taken by another user
+    if (newUsername !== currentUser.username) {
+      const existing = await getQuery('SELECT id FROM users WHERE username = ? AND id != ?', [newUsername, userId]);
+      if (existing) {
+        return res.status(400).json({ error: 'Username is already taken by another account.' });
+      }
     }
 
-    let passwordHash = req.user.password_hash;
+    let passwordHash = currentUser.password_hash;
     if (password && password.trim()) {
       passwordHash = await bcrypt.hash(password.trim(), 10);
     }
 
     await runQuery(
-      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ? WHERE id = ?`,
-      [name, email, username, passwordHash, userId]
+      `UPDATE users SET name = ?, email = ?, personal_email = ?, username = ?, password_hash = ? WHERE id = ?`,
+      [newName, newEmail, newPersonalEmail, newUsername, passwordHash, userId]
     );
 
-    const updatedUser = await getQuery('SELECT id, username, email, name, role, is_main_admin, status FROM users WHERE id = ?', [userId]);
+    const updatedUser = await getQuery('SELECT id, username, email, personal_email, name, role, is_main_admin, status FROM users WHERE id = ?', [userId]);
     const newToken = generateToken(updatedUser);
 
     res.json({

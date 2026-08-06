@@ -56,7 +56,7 @@ export const initDb = async () => {
       email TEXT,
       password_hash TEXT NOT NULL,
       name TEXT NOT NULL,
-      role TEXT CHECK(role IN ('admin', 'cashier', 'chef')) NOT NULL,
+      role TEXT CHECK(role IN ('admin', 'cashier', 'chef', 'waiter')) NOT NULL,
       is_main_admin INTEGER DEFAULT 0,
       status TEXT CHECK(status IN ('pending', 'approved', 'rejected', 'deactivated')) DEFAULT 'pending',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -65,6 +65,9 @@ export const initDb = async () => {
 
   try {
     await runQuery(`ALTER TABLE users ADD COLUMN email TEXT`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE users ADD COLUMN personal_email TEXT`);
   } catch (e) {}
   try {
     await runQuery(`ALTER TABLE users ADD COLUMN is_main_admin INTEGER DEFAULT 0`);
@@ -119,6 +122,9 @@ export const initDb = async () => {
   try {
     await runQuery(`ALTER TABLE menu_items ADD COLUMN sort_order INTEGER DEFAULT 0`);
   } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE menu_items ADD COLUMN has_customization INTEGER DEFAULT 0`);
+  } catch (e) {}
 
   await runQuery(`
     CREATE TABLE IF NOT EXISTS item_variants (
@@ -171,6 +177,7 @@ export const initDb = async () => {
       order_source TEXT CHECK(order_source IN ('customer', 'waiter')) DEFAULT 'customer',
       scheduled_time TEXT DEFAULT 'ASAP (~15 mins)',
       refund_reason TEXT,
+      utr_reference TEXT,
       prep_time_minutes INTEGER DEFAULT 15,
       estimated_ready_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -185,11 +192,21 @@ export const initDb = async () => {
     await runQuery(`ALTER TABLE orders ADD COLUMN scheduled_time TEXT DEFAULT 'ASAP (~15 mins)'`);
   } catch (e) {}
   try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN placed_by_name TEXT DEFAULT ''`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN placed_by_role TEXT DEFAULT ''`);
+  } catch (e) {}
+  try {
     await runQuery(`ALTER TABLE orders ADD COLUMN prep_time_minutes INTEGER DEFAULT 15`);
   } catch (e) {}
   try {
     await runQuery(`ALTER TABLE orders ADD COLUMN estimated_ready_at DATETIME`);
   } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN utr_reference TEXT`);
+  } catch (e) {}
+
 
   await runQuery(`
     CREATE TABLE IF NOT EXISTS order_items (
@@ -409,14 +426,30 @@ export const initDb = async () => {
 
   try {
     const hashedAdminPass = await bcrypt.hash(envAdminPassword, 10);
-    const existingMainAdmin = await getQuery('SELECT id FROM users WHERE is_main_admin = 1 OR username = ?', [envAdminUsername]);
-    if (existingMainAdmin) {
+    // First check if a user with this username already exists
+    const existingByUsername = await getQuery('SELECT id, is_main_admin FROM users WHERE username = ?', [envAdminUsername]);
+    const existingMainAdmin = await getQuery('SELECT id, username FROM users WHERE is_main_admin = 1');
+
+    if (existingByUsername) {
+      // Username exists — update that user to be main admin with latest credentials
       await runQuery(
-        `UPDATE users SET username = ?, email = ?, password_hash = ?, is_main_admin = 1, status = 'approved' WHERE id = ?`,
+        `UPDATE users SET email = ?, password_hash = ?, is_main_admin = 1, status = 'approved', role = 'admin' WHERE id = ?`,
+        [envAdminEmail, hashedAdminPass, existingByUsername.id]
+      );
+      // If there was a different main admin, demote it
+      if (existingMainAdmin && existingMainAdmin.id !== existingByUsername.id) {
+        await runQuery(`UPDATE users SET is_main_admin = 0 WHERE id = ?`, [existingMainAdmin.id]);
+      }
+      console.log(`✅ Main Admin credentials synced from .env (Email: ${envAdminEmail}, Username: ${envAdminUsername})`);
+    } else if (existingMainAdmin) {
+      // Main admin exists but with different username — update username & credentials
+      await runQuery(
+        `UPDATE users SET username = ?, email = ?, password_hash = ?, status = 'approved' WHERE id = ?`,
         [envAdminUsername, envAdminEmail, hashedAdminPass, existingMainAdmin.id]
       );
       console.log(`✅ Main Admin credentials synced from .env (Email: ${envAdminEmail}, Username: ${envAdminUsername})`);
     } else {
+      // No admin exists at all — create one
       await runQuery(
         `INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Main Admin Owner', 'admin', 1, 'approved')`,
         [envAdminUsername, envAdminEmail, hashedAdminPass]
@@ -424,14 +457,38 @@ export const initDb = async () => {
       console.log(`✅ Created Main Admin account from .env (Email: ${envAdminEmail})`);
     }
 
-    // Ensure cashier1 demo user exists
+    // Ensure demo staff users (cashier1, chef1, waiter1) exist & have updated credentials
+    const cashierPass = await bcrypt.hash('cashier123', 10);
+    const chefPass = await bcrypt.hash('chef123', 10);
+    const waiterPass = await bcrypt.hash('waiter123', 10);
+
     const existingCashier = await getQuery("SELECT id FROM users WHERE username = 'cashier1'");
-    if (!existingCashier) {
-      const cashierPass = await bcrypt.hash('cashier123', 10);
+    if (existingCashier) {
+      await runQuery(`UPDATE users SET password_hash = ?, status = 'approved', role = 'cashier' WHERE id = ?`, [cashierPass, existingCashier.id]);
+    } else {
       await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Front Cashier Sarah', 'cashier', 0, 'approved')`, [
         'cashier1', 'cashier1@aamantran.com', cashierPass
       ]);
     }
+
+    const existingChef = await getQuery("SELECT id FROM users WHERE username = 'chef1'");
+    if (existingChef) {
+      await runQuery(`UPDATE users SET password_hash = ?, status = 'approved', role = 'chef' WHERE id = ?`, [chefPass, existingChef.id]);
+    } else {
+      await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Head Chef Mario', 'chef', 0, 'approved')`, [
+        'chef1', 'chef1@aamantran.com', chefPass
+      ]);
+    }
+
+    const existingWaiter = await getQuery("SELECT id FROM users WHERE username = 'waiter1'");
+    if (existingWaiter) {
+      await runQuery(`UPDATE users SET password_hash = ?, status = 'approved', role = 'waiter' WHERE id = ?`, [waiterPass, existingWaiter.id]);
+    } else {
+      await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Floor Server Alex', 'waiter', 0, 'approved')`, [
+        'waiter1', 'waiter1@aamantran.com', waiterPass
+      ]);
+    }
+    console.log('✅ Demo staff accounts synced (cashier1, chef1, waiter1)');
   } catch (err) {
     console.error('Error syncing Main Admin credentials from .env:', err.message);
   }

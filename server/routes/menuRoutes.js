@@ -120,14 +120,14 @@ router.post('/items', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const {
       subcategory_id, name, subtitle, tags, description, price, is_veg, is_vegan,
-      is_gluten_free, spice_level, image_url, stock_quantity, low_stock_threshold, variants
+      is_gluten_free, spice_level, image_url, stock_quantity, low_stock_threshold, has_customization, variants
     } = req.body;
 
     const result = await runQuery(`
       INSERT INTO menu_items
-      (subcategory_id, name, subtitle, tags, description, price, is_veg, is_vegan, is_gluten_free, spice_level, image_url, stock_quantity, low_stock_threshold)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [subcategory_id, name, subtitle || '', tags || '', description, price, is_veg ? 1 : 0, is_vegan ? 1 : 0, is_gluten_free ? 1 : 0, spice_level || 'medium', image_url, stock_quantity || 50, low_stock_threshold || 5]);
+      (subcategory_id, name, subtitle, tags, description, price, is_veg, is_vegan, is_gluten_free, spice_level, image_url, stock_quantity, low_stock_threshold, has_customization)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [subcategory_id, name, subtitle || '', tags || '', description, price, is_veg ? 1 : 0, is_vegan ? 1 : 0, is_gluten_free ? 1 : 0, spice_level || 'medium', image_url, stock_quantity || 50, low_stock_threshold || 5, has_customization ? 1 : 0]);
 
     const itemId = result.lastID;
     if (variants && Array.isArray(variants)) {
@@ -146,15 +146,15 @@ router.put('/items/:id', verifyToken, requireRole(['admin']), async (req, res) =
   try {
     const {
       subcategory_id, name, subtitle, tags, description, price, is_veg, is_vegan,
-      is_gluten_free, spice_level, image_url, stock_quantity, low_stock_threshold, is_active, variants
+      is_gluten_free, spice_level, image_url, stock_quantity, low_stock_threshold, is_active, has_customization, variants
     } = req.body;
 
     await runQuery(`
       UPDATE menu_items SET
       subcategory_id = ?, name = ?, subtitle = ?, tags = ?, description = ?, price = ?, is_veg = ?, is_vegan = ?,
-      is_gluten_free = ?, spice_level = ?, image_url = ?, stock_quantity = ?, low_stock_threshold = ?, is_active = ?
+      is_gluten_free = ?, spice_level = ?, image_url = ?, stock_quantity = ?, low_stock_threshold = ?, is_active = ?, has_customization = ?
       WHERE id = ?
-    `, [subcategory_id, name, subtitle || '', tags || '', description, price, is_veg ? 1 : 0, is_vegan ? 1 : 0, is_gluten_free ? 1 : 0, spice_level, image_url, stock_quantity, low_stock_threshold, is_active ? 1 : 0, req.params.id]);
+    `, [subcategory_id, name, subtitle || '', tags || '', description, price, is_veg ? 1 : 0, is_vegan ? 1 : 0, is_gluten_free ? 1 : 0, spice_level, image_url, stock_quantity, low_stock_threshold, is_active ? 1 : 0, has_customization ? 1 : 0, req.params.id]);
 
     if (variants && Array.isArray(variants)) {
       await runQuery('DELETE FROM item_variants WHERE item_id = ?', [req.params.id]);

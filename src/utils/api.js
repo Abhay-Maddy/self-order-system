@@ -1,8 +1,10 @@
+import { safeStorage } from './storage';
+
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 const API_BASE = `${BASE_URL}/api`;
 
 export const fetchAPI = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('staff_token');
+  const token = safeStorage.getItem('staff_token');
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
@@ -24,7 +26,7 @@ export const fetchAPI = async (endpoint, options = {}) => {
       data = await response.json();
     } else {
       const text = await response.text();
-      throw new Error(`Server returned non-JSON response (${response.status}): ${text.slice(0, 100)}`);
+      data = { error: `Server response error (${response.status}). Please try again or check server.` };
     }
 
     if (!response.ok) {

@@ -34,6 +34,8 @@ export const TableQRManager = () => {
     loadTables();
   }, []);
 
+  const [statusMsg, setStatusMsg] = useState('');
+
   const handleAddTable = async (e) => {
     e.preventDefault();
     if (!tableNumberInput.trim()) return;
@@ -48,16 +50,22 @@ export const TableQRManager = () => {
         })
       });
       setTableNumberInput('');
+      setStatusMsg(`✓ Table #${tableNumberInput.toUpperCase()} QR code created successfully!`);
       loadTables();
+      setTimeout(() => setStatusMsg(''), 4000);
     } catch (err) {
-      alert(err.message);
+      setStatusMsg(`⚠️ Error: ${err.message}`);
     }
   };
 
-  const handleDeleteTable = async (id) => {
-    if (window.confirm('Delete this table QR configuration?')) {
+  const handleDeleteTable = async (id, tableNum) => {
+    try {
       await fetchAPI(`/tables/${id}`, { method: 'DELETE' });
+      setStatusMsg(`✓ Table #${tableNum} deleted successfully.`);
       loadTables();
+      setTimeout(() => setStatusMsg(''), 4000);
+    } catch (err) {
+      setStatusMsg(`⚠️ Error: ${err.message}`);
     }
   };
 
@@ -69,6 +77,21 @@ export const TableQRManager = () => {
           Each table receives a unique QR code that pre-binds customer sessions without app installs or logins (`C1`, `A4`).
         </span>
       </div>
+
+      {statusMsg && (
+        <div style={{
+          padding: '0.65rem 1rem',
+          borderRadius: '8px',
+          fontSize: '0.85rem',
+          fontWeight: 700,
+          marginBottom: '1rem',
+          background: statusMsg.startsWith('✓') ? 'var(--success-bg)' : 'var(--danger-bg)',
+          color: statusMsg.startsWith('✓') ? 'var(--success)' : 'var(--danger)',
+          border: `1px solid ${statusMsg.startsWith('✓') ? 'var(--success)' : 'var(--danger)'}`
+        }}>
+          {statusMsg}
+        </div>
+      )}
 
       {/* Add Table Form */}
       <form onSubmit={handleAddTable} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '2rem', background: 'var(--bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--border-radius-sm)' }}>
@@ -133,7 +156,7 @@ export const TableQRManager = () => {
                 <Download size={14} />
               </a>
               <button
-                onClick={() => handleDeleteTable(tb.id)}
+                onClick={() => handleDeleteTable(tb.id, tb.table_number)}
                 className="btn btn-danger btn-sm"
                 title="Delete Table"
               >
