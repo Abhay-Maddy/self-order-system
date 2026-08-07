@@ -6,7 +6,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { PageSkeleton } from '../Common/PageSkeleton';
 import { StaffLoginView } from '../Common/StaffLoginView';
 import { playWaiterVibrationAndChime } from '../../utils/sound';
-import { UserCheck, Bell, CheckCircle2, Clock, Utensils, RefreshCw, Filter, Smartphone, Volume2, ShieldCheck } from 'lucide-react';
+import { UserCheck, Bell, CheckCircle2, Clock, RefreshCw, Filter, Smartphone, Volume2 } from 'lucide-react';
 
 export const WaiterPanel = ({ setActivePanel }) => {
   const { user } = useContext(AuthContext);
@@ -15,7 +15,7 @@ export const WaiterPanel = ({ setActivePanel }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableFilter, setTableFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState('ready'); // 'ready' or 'delivered'
+  const [activeTab, setActiveTab] = useState('ready');
   const [lastVibratedTable, setLastVibratedTable] = useState(null);
 
   const loadOrders = useCallback(() => {
@@ -27,26 +27,19 @@ export const WaiterPanel = ({ setActivePanel }) => {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      loadOrders();
-    }
+    if (user) loadOrders();
   }, [user, loadOrders]);
 
-  // Join WebSocket rooms for live order updates & trigger haptic vibration when chef marks dish ready
   useEffect(() => {
     if (!socket || !user) return;
-
     joinRoom('kitchen');
 
     const handleOrderUpdate = (data) => {
       loadOrders();
-      // Check if an order or item was just marked 'ready' by chef
       if (data && (data.status === 'ready' || (data.items && data.items.some(i => i.status === 'ready')))) {
         const tableNum = data.table_number || data.tableNumber;
         setLastVibratedTable(tableNum || 'Active Table');
-        try {
-          playWaiterVibrationAndChime(tableNum);
-        } catch (e) {}
+        try { playWaiterVibrationAndChime(tableNum); } catch (e) {}
       }
     };
 
@@ -55,9 +48,7 @@ export const WaiterPanel = ({ setActivePanel }) => {
       if (data && (data.status === 'ready' || data.newStatus === 'ready')) {
         const tableNum = data.table_number || data.tableNumber;
         setLastVibratedTable(tableNum || 'Active Table');
-        try {
-          playWaiterVibrationAndChime(tableNum);
-        } catch (e) {}
+        try { playWaiterVibrationAndChime(tableNum); } catch (e) {}
       }
     };
 
@@ -74,88 +65,191 @@ export const WaiterPanel = ({ setActivePanel }) => {
     };
   }, [socket, user, joinRoom, loadOrders]);
 
-  // Handle Mark Delivered / Served
   const handleMarkServed = async (itemId) => {
     try {
-      await fetchAPI(`/orders/items/${itemId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'served' })
-      });
+      await fetchAPI(`/orders/items/${itemId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'served' }) });
       loadOrders();
-    } catch (err) {
-      alert(`Failed to update item: ${err.message}`);
-    }
+    } catch (err) { alert(`Failed: ${err.message}`); }
   };
 
   const handleMarkAllOrderServed = async (orderId, items) => {
     try {
-      const readyItems = items.filter(i => i.status === 'ready' || i.status === 'preparing' || i.status === 'accepted');
-      for (const item of readyItems) {
-        await fetchAPI(`/orders/items/${item.id}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'served' })
-        });
+      const toServe = items.filter(i => ['ready', 'preparing', 'accepted'].includes(i.status));
+      for (const item of toServe) {
+        await fetchAPI(`/orders/items/${item.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'served' }) });
       }
       loadOrders();
-    } catch (err) {
-      alert(`Failed to complete order delivery: ${err.message}`);
-    }
+    } catch (err) { alert(`Failed: ${err.message}`); }
   };
 
   if (!user) {
     return <StaffLoginView defaultRole="waiter" onLoginSuccess={(target) => setActivePanel && setActivePanel(target)} />;
   }
 
-  // Filter orders
   let filteredOrders = [...orders];
-  if (tableFilter !== 'all') {
-    filteredOrders = filteredOrders.filter(o => o.table_number === tableFilter);
-  }
+  if (tableFilter !== 'all') filteredOrders = filteredOrders.filter(o => o.table_number === tableFilter);
 
-  // Orders with ready items awaiting delivery
-  const readyForDeliveryOrders = filteredOrders.filter(o =>
-    o.items && o.items.some(i => i.status === 'ready')
-  );
-
-  // Orders with active items (pending / preparing)
+  const readyForDeliveryOrders = filteredOrders.filter(o => o.items && o.items.some(i => i.status === 'ready'));
   const cookingOrders = filteredOrders.filter(o =>
-    o.items && o.items.some(i => i.status === 'pending' || i.status === 'preparing' || i.status === 'accepted') &&
+    o.items && o.items.some(i => ['pending', 'preparing', 'accepted', 'cooling'].includes(i.status)) &&
     !o.items.some(i => i.status === 'ready')
   );
-
-  // Delivered orders (all items served)
-  const deliveredOrders = filteredOrders.filter(o =>
-    o.items && o.items.length > 0 && o.items.every(i => ['served', 'rejected'].includes(i.status))
-  );
-
+  const deliveredOrders = filteredOrders.filter(o => o.items && o.items.length > 0 && o.items.every(i => ['served', 'rejected'].includes(i.status)));
   const uniqueTables = Array.from(new Set(orders.map(o => o.table_number))).sort();
+
+  // Reusable table layout for each tab
+  const renderOrderTable = (ordList, mode) => {
+    if (ordList.length === 0) {
+      const msgs = {
+        ready: { icon: '🔔', title: 'No Orders Ready for Delivery', sub: 'When the chef marks dishes ready, they pop up here instantly!' },
+        cooking: { icon: '🔥', title: 'No Orders Cooking Right Now', sub: 'Active kitchen orders will appear here.' },
+        delivered: { icon: '✅', title: 'No Delivered Orders Yet', sub: 'Completed orders will be logged here.' },
+      };
+      const m = msgs[mode];
+      return (
+        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>{m.icon}</div>
+          <h3>{m.title}</h3>
+          <p style={{ fontSize: '0.85rem' }}>{m.sub}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+              <th style={{ padding: '0.5rem 0.6rem', width: '140px' }}>Order # &amp; Table</th>
+              <th style={{ padding: '0.5rem 0.6rem', width: '75px' }}>Time</th>
+              <th style={{ padding: '0.5rem 0.6rem' }}>Dishes &amp; {mode === 'ready' ? 'Deliver Actions' : 'Status'}</th>
+              <th style={{ padding: '0.5rem 0.6rem', width: '120px' }}>Order Status</th>
+              {mode === 'ready' && <th style={{ padding: '0.5rem 0.6rem', width: '130px', textAlign: 'center' }}>Deliver All</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {ordList.map(ord => {
+              const items = ord.items || [];
+              const elapsed = Math.floor((Date.now() - new Date(ord.created_at).getTime()) / 60000);
+
+              let badge = { label: 'ACTIVE', color: 'var(--text-muted)', bg: 'var(--bg-surface-elevated)' };
+              if (mode === 'delivered') badge = { label: '✅ DELIVERED', color: 'var(--success)', bg: 'var(--success-bg)' };
+              else if (mode === 'ready') badge = { label: '🔔 READY', color: '#ea580c', bg: 'rgba(249,115,22,0.12)' };
+              else badge = { label: '🔥 COOKING', color: 'var(--warning)', bg: 'var(--warning-bg)' };
+
+              return (
+                <tr key={ord.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  {/* Order # & Table */}
+                  <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.83rem', color: 'var(--brand-primary)' }}>#{ord.order_number}</div>
+                    <div style={{ marginTop: '3px' }}>
+                      <span className="badge badge-dinein" style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.1rem 0.35rem' }}>Table #{ord.table_number}</span>
+                    </div>
+                  </td>
+
+                  {/* Time */}
+                  <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top', fontSize: '0.76rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    <div>{formatTime(ord.created_at)}</div>
+                    <div style={{ fontWeight: 700 }}>{elapsed}m ago</div>
+                  </td>
+
+                  {/* Dishes & Actions */}
+                  <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      {items.map(item => {
+                        const statusColors = {
+                          pending:   { color: 'var(--danger)',  bg: 'var(--danger-bg)' },
+                          accepted:  { color: '#d97706',        bg: '#fef3c7' },
+                          preparing: { color: 'var(--warning)', bg: 'var(--warning-bg)' },
+                          cooling:   { color: '#0284c7',        bg: '#e0f2fe' },
+                          ready:     { color: '#ea580c',        bg: 'rgba(249,115,22,0.12)' },
+                          served:    { color: 'var(--success)', bg: 'var(--success-bg)' },
+                          rejected:  { color: 'var(--danger)',  bg: 'var(--danger-bg)' },
+                        };
+                        const sc = statusColors[item.status] || statusColors.pending;
+
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem',
+                              padding: '0.28rem 0.55rem',
+                              background: 'var(--bg-surface-elevated)',
+                              border: `1px solid ${sc.color}28`,
+                              borderLeft: `3px solid ${sc.color}`,
+                              borderRadius: '7px',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: '110px' }}>
+                              <span style={{ fontWeight: 800, fontSize: '0.8rem' }}>{item.quantity}× {item.item_name}</span>
+                              {item.variant_name && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginLeft: '4px' }}>({item.variant_name})</span>}
+                              <span style={{ marginLeft: '5px', fontSize: '0.64rem', background: item.fulfillment_type === 'dine_in' ? '#dbeafe' : '#fef3c7', color: item.fulfillment_type === 'dine_in' ? '#1d4ed8' : '#b45309', borderRadius: '4px', padding: '0 5px', fontWeight: 700 }}>
+                                {item.fulfillment_type === 'dine_in' ? 'Dine-In' : 'Takeaway'}
+                              </span>
+                            </div>
+
+                            {/* Status badge */}
+                            <span style={{ background: sc.bg, color: sc.color, borderRadius: '5px', fontSize: '0.65rem', fontWeight: 800, padding: '1px 7px', whiteSpace: 'nowrap' }}>
+                              {item.status.toUpperCase()}
+                            </span>
+
+                            {/* Deliver button — only for ready items in ready tab */}
+                            {mode === 'ready' && item.status === 'ready' && (
+                              <button
+                                onClick={() => handleMarkServed(item.id)}
+                                style={{ border: 'none', borderRadius: '7px', padding: '0.22rem 0.55rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', background: 'var(--success)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}
+                              >
+                                <CheckCircle2 size={12} /> Deliver
+                              </button>
+                            )}
+                            {mode === 'ready' && item.status === 'served' && (
+                              <span style={{ fontSize: '0.68rem', color: 'var(--success)', fontWeight: 800 }}>✅ Delivered</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </td>
+
+                  {/* Status */}
+                  <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                    <span style={{ background: badge.bg, color: badge.color, borderRadius: '7px', fontSize: '0.72rem', fontWeight: 800, padding: '0.25rem 0.5rem', display: 'inline-block' }}>
+                      {badge.label}
+                    </span>
+                  </td>
+
+                  {/* Deliver All button */}
+                  {mode === 'ready' && (
+                    <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'middle', textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleMarkAllOrderServed(ord.id, items)}
+                        style={{ border: 'none', borderRadius: '9px', padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', background: 'var(--success)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}
+                      >
+                        <CheckCircle2 size={14} /> Deliver All
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
     <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
-      {/* Live Haptic Vibration & Audio Alert Banner */}
+      {/* Alert Banner */}
       {lastVibratedTable && (
-        <div style={{
-          background: 'linear-gradient(135deg, #10b981, #059669)',
-          color: '#ffffff',
-          padding: '0.85rem 1.25rem',
-          borderRadius: '12px',
-          marginBottom: '1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)'
-        }}>
+        <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', padding: '0.85rem 1.25rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 8px 25px rgba(16,185,129,0.4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 800, fontSize: '0.95rem' }}>
             <Smartphone size={22} />
             <Volume2 size={22} />
-            <span>📳 CHEF ALERT: Dish Ready to Serve for Table #{lastVibratedTable}! (Device Vibrating & Alerting)</span>
+            <span>📳 CHEF ALERT: Dish Ready — Table #{lastVibratedTable}! (Device Alerting)</span>
           </div>
-          <button
-            onClick={() => setLastVibratedTable(null)}
-            className="btn btn-sm"
-            style={{ background: 'rgba(255, 255, 255, 0.25)', color: '#fff', border: 'none', padding: '0.3rem 0.6rem', fontWeight: 800 }}
-          >
-            Dismiss Alert
+          <button onClick={() => setLastVibratedTable(null)} style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.3rem 0.6rem', fontWeight: 800, cursor: 'pointer' }}>
+            Dismiss
           </button>
         </div>
       )}
@@ -170,183 +264,45 @@ export const WaiterPanel = ({ setActivePanel }) => {
             <div>
               <h2 style={{ fontSize: '1.3rem' }}>Waiter &amp; Server Delivery Portal</h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Staff User: <strong>{user.name || user.username}</strong> • {readyForDeliveryOrders.length} Orders Ready to Deliver
+                Staff: <strong>{user.name || user.username}</strong> • {readyForDeliveryOrders.length} Orders Ready to Deliver
               </span>
             </div>
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
               <Filter size={16} style={{ color: 'var(--brand-primary)' }} />
-              <select
-                value={tableFilter}
-                onChange={(e) => setTableFilter(e.target.value)}
-                className="input-field"
-                style={{ width: 'auto', padding: '0.35rem 0.6rem', fontSize: '0.85rem' }}
-              >
+              <select value={tableFilter} onChange={(e) => setTableFilter(e.target.value)} className="input-field" style={{ width: 'auto', padding: '0.35rem 0.6rem', fontSize: '0.85rem' }}>
                 <option value="all">All Tables</option>
-                {uniqueTables.map(t => (
-                  <option key={t} value={t}>Table #{t}</option>
-                ))}
+                {uniqueTables.map(t => <option key={t} value={t}>Table #{t}</option>)}
               </select>
             </div>
-
-            <button onClick={loadOrders} className="btn btn-secondary btn-sm" title="Refresh">
-              <RefreshCw size={16} />
-            </button>
+            <button onClick={loadOrders} className="btn btn-secondary btn-sm" title="Refresh"><RefreshCw size={16} /></button>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
-        <button
-          onClick={() => setActiveTab('ready')}
-          className={`btn ${activeTab === 'ready' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.9rem', gap: '0.4rem' }}
-        >
-          <Bell size={16} />
-          <span>Ready for Delivery ({readyForDeliveryOrders.length})</span>
+        <button onClick={() => setActiveTab('ready')} className={`btn ${activeTab === 'ready' ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.9rem', gap: '0.4rem' }}>
+          <Bell size={16} /> Ready for Delivery ({readyForDeliveryOrders.length})
         </button>
-        <button
-          onClick={() => setActiveTab('cooking')}
-          className={`btn ${activeTab === 'cooking' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.9rem', gap: '0.4rem' }}
-        >
-          <Clock size={16} />
-          <span>In Kitchen Prep ({cookingOrders.length})</span>
+        <button onClick={() => setActiveTab('cooking')} className={`btn ${activeTab === 'cooking' ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.9rem', gap: '0.4rem' }}>
+          <Clock size={16} /> In Kitchen Prep ({cookingOrders.length})
         </button>
-        <button
-          onClick={() => setActiveTab('delivered')}
-          className={`btn ${activeTab === 'delivered' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ fontSize: '0.9rem', gap: '0.4rem' }}
-        >
-          <CheckCircle2 size={16} />
-          <span>Delivered Log ({deliveredOrders.length})</span>
+        <button onClick={() => setActiveTab('delivered')} className={`btn ${activeTab === 'delivered' ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.9rem', gap: '0.4rem' }}>
+          <CheckCircle2 size={16} /> Delivered Log ({deliveredOrders.length})
         </button>
       </div>
 
+      {/* Content */}
       {loading ? (
         <PageSkeleton title="Connecting Live Waiter KDS..." icon={UserCheck} />
       ) : (
-        <>
-          {/* READY FOR DELIVERY TAB */}
-          {activeTab === 'ready' && (
-            <div>
-              {readyForDeliveryOrders.length === 0 ? (
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <Bell size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-                  <h3>No Orders Ready for Delivery</h3>
-                  <p style={{ fontSize: '0.85rem' }}>When the kitchen marks dishes as ready, they will instantly pop up here!</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
-                  {readyForDeliveryOrders.map(ord => (
-                    <div key={ord.id} className="glass-card animate-slide-up" style={{ padding: '1rem', borderLeft: '4px solid var(--success)', minWidth: '285px', maxWidth: '315px', flex: '0 0 auto' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.65rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem' }}>
-                        <div>
-                          <div style={{ fontWeight: 900, fontSize: '1.1rem', color: 'var(--brand-primary)' }}>TABLE #{ord.table_number}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{ord.order_number} • {formatTime(ord.created_at)}</div>
-                        </div>
-                        <span style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px' }}>🔔 READY</span>
-                      </div>
-
-                      {/* Item pills with deliver buttons */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
-                        {(ord.items || []).map(item => (
-                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'var(--bg-surface)', borderRadius: '8px', border: item.status === 'ready' ? '1px solid var(--success)' : '1px solid var(--border-color)' }}>
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{item.quantity}× {item.item_name}</div>
-                              {item.variant_name && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({item.variant_name})</span>}
-                              <span style={{ marginLeft: '0.3rem', fontSize: '0.65rem', background: item.fulfillment_type === 'dine_in' ? 'var(--info-bg)' : 'var(--warning-bg)', color: item.fulfillment_type === 'dine_in' ? 'var(--info)' : 'var(--warning)', borderRadius: '4px', padding: '1px 4px', fontWeight: 700 }}>
-                                {item.fulfillment_type === 'dine_in' ? 'Dine-In' : 'Takeaway'}
-                              </span>
-                            </div>
-                            {item.status === 'ready' ? (
-                              <button onClick={() => handleMarkServed(item.id)} style={{ background: 'var(--success)', color: '#fff', border: 'none', borderRadius: '7px', padding: '0.22rem 0.55rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                <CheckCircle2 size={12} /> Deliver
-                              </button>
-                            ) : (
-                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>{item.status.toUpperCase()}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        onClick={() => handleMarkAllOrderServed(ord.id, ord.items)}
-                        style={{ width: '100%', background: 'var(--success)', color: '#fff', border: 'none', borderRadius: '10px', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                      >
-                        <CheckCircle2 size={16} /> Deliver All Table Order
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* IN KITCHEN PREP TAB */}
-          {activeTab === 'cooking' && (
-            <div>
-              {cookingOrders.length === 0 ? (
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <h3>No Orders Currently Cooking</h3>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
-                  {cookingOrders.map(ord => (
-                    <div key={ord.id} className="glass-card" style={{ padding: '1rem', borderLeft: '4px solid var(--warning)', minWidth: '265px', maxWidth: '300px', flex: '0 0 auto' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>TABLE #{ord.table_number}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{ord.order_number}</div>
-                        </div>
-                        <span style={{ background: 'var(--warning-bg)', color: 'var(--warning)', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px' }}>⏳ Cooking</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        {(ord.items || []).map(item => (
-                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', padding: '0.3rem 0.5rem', background: 'var(--bg-surface)', borderRadius: '6px' }}>
-                            <span>{item.quantity}× {item.item_name}</span>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{item.status}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* DELIVERED LOG TAB */}
-          {activeTab === 'delivered' && (
-            <div>
-              {deliveredOrders.length === 0 ? (
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <h3>No Delivered Orders Yet</h3>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
-                  {deliveredOrders.map(ord => (
-                    <div key={ord.id} className="glass-card" style={{ padding: '1rem', opacity: 0.85, minWidth: '250px', maxWidth: '290px', flex: '0 0 auto' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.55rem' }}>
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: '1rem' }}>TABLE #{ord.table_number}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>#{ord.order_number}</div>
-                        </div>
-                        <span style={{ background: 'var(--success-bg)', color: 'var(--success)', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px' }}>✓ Done</span>
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {(ord.items || []).map(i => `${i.quantity}× ${i.item_name}`).join(', ')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </>
+        <div className="glass-card" style={{ padding: '1.25rem' }}>
+          {activeTab === 'ready'     && renderOrderTable(readyForDeliveryOrders, 'ready')}
+          {activeTab === 'cooking'   && renderOrderTable(cookingOrders, 'cooking')}
+          {activeTab === 'delivered' && renderOrderTable(deliveredOrders, 'delivered')}
+        </div>
       )}
     </div>
   );
