@@ -6,7 +6,7 @@ import { ChefHat, Shield, Lock, KeyRound, ArrowDown, UserCheck } from 'lucide-re
 export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const { login } = useContext(AuthContext);
 
-  const [selectedRole, setSelectedRole] = useState('chef'); // 'chef' or 'admin'
+  const [selectedRole, setSelectedRole] = useState('chef'); // 'chef', 'waiter', or 'admin'
   const [username, setUsername] = useState('chef1');
   const [password, setPassword] = useState('chef123');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,6 +20,9 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     if (role === 'chef') {
       setUsername('chef1');
       setPassword('chef123');
+    } else if (role === 'waiter') {
+      setUsername('waiter1');
+      setPassword('waiter123');
     } else {
       setUsername('admin');
       setPassword('admin123');
@@ -32,8 +35,12 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     setErrorMsg('');
     try {
       const loggedUser = await login(username, password);
+      let targetPanel = 'admin';
+      if (loggedUser.role === 'waiter') targetPanel = 'waiter';
+      else if (loggedUser.role === 'chef') targetPanel = 'kitchen';
+
       if (onLoginSuccess) {
-        onLoginSuccess(loggedUser.role === 'chef' ? 'kitchen' : 'admin');
+        onLoginSuccess(targetPanel);
       }
       onClose();
     } catch (err) {
@@ -69,8 +76,8 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         {/* Role Tabs */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '0.5rem',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '0.35rem',
           background: 'var(--bg-surface-elevated)',
           padding: '0.35rem',
           borderRadius: 'var(--border-radius-sm)',
@@ -81,20 +88,30 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             type="button"
             onClick={() => handleRoleTabChange('chef')}
             className={`btn btn-sm ${selectedRole === 'chef' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ border: 'none', gap: '0.4rem', justifyContent: 'center' }}
+            style={{ border: 'none', gap: '0.3rem', justifyContent: 'center', fontSize: '0.78rem', padding: '0.4rem 0.2rem' }}
           >
-            <ChefHat size={16} />
-            <span>Kitchen Chef</span>
+            <ChefHat size={15} />
+            <span>Chef</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleRoleTabChange('waiter')}
+            className={`btn btn-sm ${selectedRole === 'waiter' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ border: 'none', gap: '0.3rem', justifyContent: 'center', fontSize: '0.78rem', padding: '0.4rem 0.2rem' }}
+          >
+            <UserCheck size={15} />
+            <span>Waiter</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleRoleTabChange('admin')}
             className={`btn btn-sm ${selectedRole === 'admin' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ border: 'none', gap: '0.4rem', justifyContent: 'center' }}
+            style={{ border: 'none', gap: '0.3rem', justifyContent: 'center', fontSize: '0.78rem', padding: '0.4rem 0.2rem' }}
           >
-            <Shield size={16} />
-            <span>Admin / Cashier</span>
+            <Shield size={15} />
+            <span>Admin</span>
           </button>
         </div>
 
@@ -116,7 +133,7 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
               onChange={e => setUsername(e.target.value)}
               required
               className="input-field"
-              placeholder="e.g. chef1 or admin"
+              placeholder={`e.g. ${selectedRole === 'chef' ? 'chef1' : selectedRole === 'waiter' ? 'waiter1' : 'admin'}`}
             />
           </div>
 
@@ -136,7 +153,7 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
           <button type="submit" disabled={isSubmitting} className="btn btn-primary btn-lg" style={{ width: '100%', gap: '0.5rem' }}>
             <KeyRound size={18} />
-            <span>{isSubmitting ? 'Authenticating...' : `Sign In as ${selectedRole === 'chef' ? 'Chef' : 'Admin'}`}</span>
+            <span>{isSubmitting ? 'Authenticating...' : `Sign In as ${selectedRole === 'chef' ? 'Chef' : selectedRole === 'waiter' ? 'Waiter' : 'Admin'}`}</span>
           </button>
         </form>
 
@@ -148,12 +165,21 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <button
+              onClick={() => handleQuickDemoLogin('waiter1', 'waiter123', 'waiter')}
+              className="btn btn-secondary btn-sm"
+              style={{ justifyContent: 'space-between', fontSize: '0.8rem' }}
+            >
+              <span>🤵 Waiter Server Pass (`waiter1`)</span>
+              <span className="badge badge-dinein">Quick Pass →</span>
+            </button>
+
+            <button
               onClick={() => handleQuickDemoLogin('chef1', 'chef123', 'kitchen')}
               className="btn btn-secondary btn-sm"
               style={{ justifyContent: 'space-between', fontSize: '0.8rem' }}
             >
               <span>👨‍🍳 Head Chef Pass (`chef1`)</span>
-              <span className="badge badge-dinein">Quick Pass →</span>
+              <span className="badge badge-packing">Quick Pass →</span>
             </button>
 
             <button
@@ -163,15 +189,6 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             >
               <span>📊 Owner Admin (`admin`)</span>
               <span className="badge badge-veg">Quick Pass →</span>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoLogin('cashier1', 'cashier123', 'admin')}
-              className="btn btn-secondary btn-sm"
-              style={{ justifyContent: 'space-between', fontSize: '0.8rem' }}
-            >
-              <span>💳 Cashier Billing (`cashier1`)</span>
-              <span className="badge badge-packing">Quick Pass →</span>
             </button>
           </div>
         </div>

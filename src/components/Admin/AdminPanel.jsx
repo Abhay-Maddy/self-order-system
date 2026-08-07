@@ -18,17 +18,25 @@ import { AuthContext } from '../../context/AuthContext';
 import { fetchAPI } from '../../utils/api';
 import { Shield, Lock } from 'lucide-react';
 
-export const AdminPanel = () => {
+export const AdminPanel = ({ setActivePanel }) => {
   const { user, login } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('overview');
 
   if (!user || !['admin', 'cashier'].includes(user.role)) {
-    return <StaffLoginView defaultRole="admin" />;
+    if (user && user.role === 'waiter') {
+      if (setActivePanel) setActivePanel('waiter');
+      return null;
+    }
+    if (user && user.role === 'chef') {
+      if (setActivePanel) setActivePanel('kitchen');
+      return null;
+    }
+    return <StaffLoginView defaultRole="admin" onLoginSuccess={(target) => setActivePanel && setActivePanel(target)} />;
   }
 
   const renderActiveTabContent = () => {
     switch (activeTab) {
-      case 'overview': return <DashboardOverview />;
+      case 'overview': return <DashboardOverview setActivePanel={setActivePanel} />;
       case 'live_orders': return <AdminLiveOrdersDrawer />;
       case 'billing': return <BillingView />;
       case 'refunds': return <RefundManager />;
@@ -46,12 +54,13 @@ export const AdminPanel = () => {
   };
 
   return (
-    <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+    <div className="container" style={{ padding: '1rem 0.5rem 4rem', maxWidth: '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', gap: '1rem', alignItems: 'start' }}>
         <AdminSidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           role={user.role}
+          setActivePanel={setActivePanel}
         />
         <div>
           {renderActiveTabContent()}

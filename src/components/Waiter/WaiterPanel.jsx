@@ -5,9 +5,10 @@ import { SocketContext } from '../../context/SocketContext';
 import { AuthContext } from '../../context/AuthContext';
 import { PageSkeleton } from '../Common/PageSkeleton';
 import { StaffLoginView } from '../Common/StaffLoginView';
-import { UserCheck, Bell, CheckCircle2, Clock, Utensils, RefreshCw, Filter } from 'lucide-react';
+import { playWaiterVibrationAndChime } from '../../utils/sound';
+import { UserCheck, Bell, CheckCircle2, Clock, Utensils, RefreshCw, Filter, Smartphone, Volume2, ShieldCheck } from 'lucide-react';
 
-export const WaiterPanel = () => {
+export const WaiterPanel = ({ setActivePanel }) => {
   const { user } = useContext(AuthContext);
   const { socket, joinRoom } = useContext(SocketContext);
 
@@ -15,6 +16,7 @@ export const WaiterPanel = () => {
   const [loading, setLoading] = useState(true);
   const [tableFilter, setTableFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('ready'); // 'ready' or 'delivered'
+  const [lastVibratedTable, setLastVibratedTable] = useState(null);
 
   const loadOrders = useCallback(() => {
     setLoading(true);
@@ -30,24 +32,45 @@ export const WaiterPanel = () => {
     }
   }, [user, loadOrders]);
 
-  // Join WebSocket rooms for live order updates
+  // Join WebSocket rooms for live order updates & trigger haptic vibration when chef marks dish ready
   useEffect(() => {
     if (!socket || !user) return;
 
     joinRoom('kitchen');
 
-    const handleOrderUpdate = () => {
+    const handleOrderUpdate = (data) => {
       loadOrders();
+      // Check if an order or item was just marked 'ready' by chef
+      if (data && (data.status === 'ready' || (data.items && data.items.some(i => i.status === 'ready')))) {
+        const tableNum = data.table_number || data.tableNumber;
+        setLastVibratedTable(tableNum || 'Active Table');
+        try {
+          playWaiterVibrationAndChime(tableNum);
+        } catch (e) {}
+      }
+    };
+
+    const handleItemStatusUpdated = (data) => {
+      loadOrders();
+      if (data && (data.status === 'ready' || data.newStatus === 'ready')) {
+        const tableNum = data.table_number || data.tableNumber;
+        setLastVibratedTable(tableNum || 'Active Table');
+        try {
+          playWaiterVibrationAndChime(tableNum);
+        } catch (e) {}
+      }
     };
 
     socket.on('new_order', handleOrderUpdate);
     socket.on('order_updated', handleOrderUpdate);
-    socket.on('item_status_updated', handleOrderUpdate);
+    socket.on('item_status_updated', handleItemStatusUpdated);
+    socket.on('table_order_updated', handleOrderUpdate);
 
     return () => {
       socket.off('new_order', handleOrderUpdate);
       socket.off('order_updated', handleOrderUpdate);
-      socket.off('item_status_updated', handleOrderUpdate);
+      socket.off('item_status_updated', handleItemStatusUpdated);
+      socket.off('table_order_updated', handleOrderUpdate);
     };
   }, [socket, user, joinRoom, loadOrders]);
 
@@ -80,7 +103,7 @@ export const WaiterPanel = () => {
   };
 
   if (!user) {
-    return <StaffLoginView defaultRole="waiter" />;
+    return <StaffLoginView defaultRole="waiter" onLoginSuccess={(target) => setActivePanel && setActivePanel(target)} />;
   }
 
   // Filter orders
@@ -109,6 +132,34 @@ export const WaiterPanel = () => {
 
   return (
     <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
+      {/* Live Haptic Vibration & Audio Alert Banner */}
+      {lastVibratedTable && (
+        <div style={{
+          background: 'linear-gradient(135deg, #10b981, #059669)',
+          color: '#ffffff',
+          padding: '0.85rem 1.25rem',
+          borderRadius: '12px',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 800, fontSize: '0.95rem' }}>
+            <Smartphone size={22} />
+            <Volume2 size={22} />
+            <span>📳 CHEF ALERT: Dish Ready to Serve for Table #{lastVibratedTable}! (Device Vibrating & Alerting)</span>
+          </div>
+          <button
+            onClick={() => setLastVibratedTable(null)}
+            className="btn btn-sm"
+            style={{ background: 'rgba(255, 255, 255, 0.25)', color: '#fff', border: 'none', padding: '0.3rem 0.6rem', fontWeight: 800 }}
+          >
+            Dismiss Alert
+          </button>
+        </div>
+      )}
+
       {/* Header Card */}
       <div className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
@@ -181,83 +232,55 @@ export const WaiterPanel = () => {
         <>
           {/* READY FOR DELIVERY TAB */}
           {activeTab === 'ready' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-              {readyForDeliveryOrders.map(ord => (
-                <div key={ord.id} className="glass-card animate-slide-up" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 900, fontSize: '1.3rem', color: 'var(--brand-primary)' }}>
-                        TABLE #{ord.table_number}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        #{ord.order_number} • {formatTime(ord.created_at)}
-                      </div>
-                    </div>
-                    <span className="badge badge-veg" style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem' }}>
-                      🔔 READY TO SERVE
-                    </span>
-                  </div>
-
-                  {/* Items List */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-                    {(ord.items || []).map(item => (
-                      <div
-                        key={item.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.5rem 0.75rem',
-                          background: 'var(--bg-surface)',
-                          borderRadius: '8px',
-                          border: item.status === 'ready' ? '1px solid var(--success)' : '1px solid var(--border-color)'
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                            {item.quantity}x {item.item_name}
-                          </div>
-                          {item.variant_name && (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({item.variant_name})</span>
-                          )}
-                          <span className={`badge ${item.fulfillment_type === 'dine_in' ? 'badge-dinein' : 'badge-packing'}`} style={{ marginLeft: '0.3rem', fontSize: '0.7rem' }}>
-                            {item.fulfillment_type === 'dine_in' ? 'Dine-In' : 'Takeaway'}
-                          </span>
-                        </div>
-
-                        {item.status === 'ready' ? (
-                          <button
-                            onClick={() => handleMarkServed(item.id)}
-                            className="btn btn-success btn-sm"
-                            style={{ gap: '0.3rem', padding: '0.35rem 0.65rem' }}
-                          >
-                            <CheckCircle2 size={14} /> Deliver
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                            {item.status.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => handleMarkAllOrderServed(ord.id, ord.items)}
-                    className="btn btn-primary btn-lg"
-                    style={{ width: '100%', gap: '0.5rem', borderRadius: '10px', background: 'var(--success)' }}
-                  >
-                    <CheckCircle2 size={18} />
-                    <span>Deliver Entire Table Order</span>
-                  </button>
-                </div>
-              ))}
-
-              {readyForDeliveryOrders.length === 0 && (
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+            <div>
+              {readyForDeliveryOrders.length === 0 ? (
+                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <Bell size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                   <h3>No Orders Ready for Delivery</h3>
                   <p style={{ fontSize: '0.85rem' }}>When the kitchen marks dishes as ready, they will instantly pop up here!</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
+                  {readyForDeliveryOrders.map(ord => (
+                    <div key={ord.id} className="glass-card animate-slide-up" style={{ padding: '1rem', borderLeft: '4px solid var(--success)', minWidth: '285px', maxWidth: '315px', flex: '0 0 auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.65rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 900, fontSize: '1.1rem', color: 'var(--brand-primary)' }}>TABLE #{ord.table_number}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{ord.order_number} • {formatTime(ord.created_at)}</div>
+                        </div>
+                        <span style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px' }}>🔔 READY</span>
+                      </div>
+
+                      {/* Item pills with deliver buttons */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                        {(ord.items || []).map(item => (
+                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'var(--bg-surface)', borderRadius: '8px', border: item.status === 'ready' ? '1px solid var(--success)' : '1px solid var(--border-color)' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{item.quantity}× {item.item_name}</div>
+                              {item.variant_name && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({item.variant_name})</span>}
+                              <span style={{ marginLeft: '0.3rem', fontSize: '0.65rem', background: item.fulfillment_type === 'dine_in' ? 'var(--info-bg)' : 'var(--warning-bg)', color: item.fulfillment_type === 'dine_in' ? 'var(--info)' : 'var(--warning)', borderRadius: '4px', padding: '1px 4px', fontWeight: 700 }}>
+                                {item.fulfillment_type === 'dine_in' ? 'Dine-In' : 'Takeaway'}
+                              </span>
+                            </div>
+                            {item.status === 'ready' ? (
+                              <button onClick={() => handleMarkServed(item.id)} style={{ background: 'var(--success)', color: '#fff', border: 'none', borderRadius: '7px', padding: '0.22rem 0.55rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <CheckCircle2 size={12} /> Deliver
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>{item.status.toUpperCase()}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => handleMarkAllOrderServed(ord.id, ord.items)}
+                        style={{ width: '100%', background: 'var(--success)', color: '#fff', border: 'none', borderRadius: '10px', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                      >
+                        <CheckCircle2 size={16} /> Deliver All Table Order
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -265,32 +288,32 @@ export const WaiterPanel = () => {
 
           {/* IN KITCHEN PREP TAB */}
           {activeTab === 'cooking' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
-              {cookingOrders.map(ord => (
-                <div key={ord.id} className="glass-card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--warning)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '1.15rem' }}>TABLE #{ord.table_number}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>#{ord.order_number}</div>
-                    </div>
-                    <span className="badge" style={{ background: 'var(--warning-bg)', color: 'var(--warning)', fontSize: '0.78rem' }}>
-                      ⏳ In Kitchen Prep
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    {(ord.items || []).map(item => (
-                      <div key={item.id} style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                        • {item.quantity}x {item.item_name} — <em>({item.status})</em>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              {cookingOrders.length === 0 && (
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+            <div>
+              {cookingOrders.length === 0 ? (
+                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <h3>No Orders Currently Cooking</h3>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
+                  {cookingOrders.map(ord => (
+                    <div key={ord.id} className="glass-card" style={{ padding: '1rem', borderLeft: '4px solid var(--warning)', minWidth: '265px', maxWidth: '300px', flex: '0 0 auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>TABLE #{ord.table_number}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{ord.order_number}</div>
+                        </div>
+                        <span style={{ background: 'var(--warning-bg)', color: 'var(--warning)', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px' }}>⏳ Cooking</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        {(ord.items || []).map(item => (
+                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', padding: '0.3rem 0.5rem', background: 'var(--bg-surface)', borderRadius: '6px' }}>
+                            <span>{item.quantity}× {item.item_name}</span>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{item.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -298,28 +321,27 @@ export const WaiterPanel = () => {
 
           {/* DELIVERED LOG TAB */}
           {activeTab === 'delivered' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
-              {deliveredOrders.map(ord => (
-                <div key={ord.id} className="glass-card" style={{ padding: '1.25rem', opacity: 0.85 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>TABLE #{ord.table_number}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>#{ord.order_number}</div>
-                    </div>
-                    <span className="badge" style={{ background: 'var(--success-bg)', color: 'var(--success)', fontSize: '0.78rem' }}>
-                      ✓ Delivered
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    {(ord.items || []).map(i => `${i.quantity}x ${i.item_name}`).join(', ')}
-                  </div>
-                </div>
-              ))}
-
-              {deliveredOrders.length === 0 && (
-                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+            <div>
+              {deliveredOrders.length === 0 ? (
+                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <h3>No Delivered Orders Yet</h3>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
+                  {deliveredOrders.map(ord => (
+                    <div key={ord.id} className="glass-card" style={{ padding: '1rem', opacity: 0.85, minWidth: '250px', maxWidth: '290px', flex: '0 0 auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.55rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '1rem' }}>TABLE #{ord.table_number}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>#{ord.order_number}</div>
+                        </div>
+                        <span style={{ background: 'var(--success-bg)', color: 'var(--success)', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px' }}>✓ Done</span>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {(ord.items || []).map(i => `${i.quantity}× ${i.item_name}`).join(', ')}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

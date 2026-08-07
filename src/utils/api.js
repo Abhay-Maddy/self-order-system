@@ -35,6 +35,32 @@ export const fetchAPI = async (endpoint, options = {}) => {
     return data;
   } catch (err) {
     console.error(`API Error on [${endpoint}]:`, err.message);
+    if (err.name === 'TypeError' || err.message === 'Failed to fetch' || err.message.includes('fetch')) {
+      try {
+        const directUrl = endpoint.startsWith('http') ? endpoint : `http://localhost:5000/api${endpoint}`;
+        const fallbackRes = await fetch(directUrl, {
+          ...options,
+          headers,
+        });
+        const contentType = fallbackRes.headers.get('content-type');
+        let fallbackData;
+        if (contentType && contentType.includes('application/json')) {
+          fallbackData = await fallbackRes.json();
+        } else {
+          const txt = await fallbackRes.text();
+          fallbackData = { error: `Server error (${fallbackRes.status})` };
+        }
+        if (!fallbackRes.ok) {
+          throw new Error(fallbackData.error || `API Error (${fallbackRes.status})`);
+        }
+        return fallbackData;
+      } catch (fallbackErr) {
+        if (fallbackErr.message && fallbackErr.message !== 'Failed to fetch' && !fallbackErr.message.includes('fetch')) {
+          throw fallbackErr;
+        }
+      }
+      throw new Error('Connection lost. Please make sure backend server is running on http://localhost:5000.');
+    }
     throw err;
   }
 };

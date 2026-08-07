@@ -64,6 +64,7 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// Server entry point updated at 2026-08-07T01:40:00+05:30
 // Serve static frontend build from dist folder
 const distPath = path.join(__dirname, '../dist');
 const distIndexPath = path.join(distPath, 'index.html');

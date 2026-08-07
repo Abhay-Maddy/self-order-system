@@ -70,6 +70,9 @@ export const initDb = async () => {
     await runQuery(`ALTER TABLE users ADD COLUMN personal_email TEXT`);
   } catch (e) {}
   try {
+    await runQuery(`ALTER TABLE users ADD COLUMN phone TEXT`);
+  } catch (e) {}
+  try {
     await runQuery(`ALTER TABLE users ADD COLUMN is_main_admin INTEGER DEFAULT 0`);
   } catch (e) {}
 
@@ -205,6 +208,24 @@ export const initDb = async () => {
   } catch (e) {}
   try {
     await runQuery(`ALTER TABLE orders ADD COLUMN utr_reference TEXT`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN refunded_amount REAL DEFAULT 0`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN cash_paid REAL DEFAULT 0`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN online_paid REAL DEFAULT 0`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN refund_cash_amount REAL DEFAULT 0`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN refund_online_amount REAL DEFAULT 0`);
+  } catch (e) {}
+  try {
+    await runQuery(`ALTER TABLE orders ADD COLUMN refund_mode TEXT DEFAULT 'cash'`);
   } catch (e) {}
 
 
@@ -480,15 +501,42 @@ export const initDb = async () => {
       ]);
     }
 
-    const existingWaiter = await getQuery("SELECT id FROM users WHERE username = 'waiter1'");
-    if (existingWaiter) {
-      await runQuery(`UPDATE users SET password_hash = ?, status = 'approved', role = 'waiter' WHERE id = ?`, [waiterPass, existingWaiter.id]);
-    } else {
-      await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Floor Server Alex', 'waiter', 0, 'approved')`, [
-        'waiter1', 'waiter1@aamantran.com', waiterPass
-      ]);
+    try {
+      const existingWaiter = await getQuery("SELECT id FROM users WHERE username = 'waiter1'");
+      if (existingWaiter) {
+        await runQuery(`UPDATE users SET password_hash = ?, status = 'approved', role = 'cashier' WHERE id = ?`, [waiterPass, existingWaiter.id]);
+      } else {
+        await runQuery(`INSERT INTO users (username, email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, 'Floor Server Alex', 'cashier', 0, 'approved')`, [
+          'waiter1', 'waiter1@aamantran.com', waiterPass
+        ]);
+      }
+      console.log('✅ Demo staff accounts synced (cashier1, chef1, waiter1)');
+    } catch (e) {
+      console.log('Note on staff accounts sync:', e.message);
     }
-    console.log('✅ Demo staff accounts synced (cashier1, chef1, waiter1)');
+
+    // Sync any orders whose created_at string differs from order_number date
+    try {
+      const allOrders = await allQuery(`SELECT id, order_number, created_at FROM orders WHERE order_number LIKE 'ORD-%'`);
+      for (const ord of allOrders) {
+        const parts = ord.order_number.split('-');
+        if (parts.length >= 2 && parts[1].length === 6) {
+          const yy = '20' + parts[1].slice(0, 2);
+          const mm = parts[1].slice(2, 4);
+          const dd = parts[1].slice(4, 6);
+          const expectedDateStr = `${yy}-${mm}-${dd}`;
+          
+          if (ord.created_at && !ord.created_at.startsWith(expectedDateStr)) {
+            const timePart = ord.created_at.includes(' ') ? ord.created_at.split(' ')[1] : (ord.created_at.includes('T') ? ord.created_at.split('T')[1].slice(0, 8) : '12:00:00');
+            const fixedCreatedAt = `${expectedDateStr} ${timePart}`;
+            await runQuery(`UPDATE orders SET created_at = ? WHERE id = ?`, [fixedCreatedAt, ord.id]);
+            console.log(`🔧 Synchronized order #${ord.order_number} created_at to local date: ${fixedCreatedAt}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error synchronizing order created_at dates:', e.message);
+    }
   } catch (err) {
     console.error('Error syncing Main Admin credentials from .env:', err.message);
   }

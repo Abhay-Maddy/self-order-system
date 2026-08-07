@@ -8,20 +8,34 @@ export const ItemCustomizationModal = ({ item, isOpen, onClose, onAddToCart }) =
   const { t } = useContext(LanguageContext);
   if (!item) return null;
 
+  let parsedVariants = [];
+  if (item.variants) {
+    parsedVariants = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants;
+  } else {
+    parsedVariants = [
+      { name: 'Half', price_modifier: 0, pieces: 4 },
+      { name: 'Full', price_modifier: 80, pieces: 8 }
+    ];
+  }
+
+  let availableToppings = [];
+  if (item.toppings) {
+    availableToppings = typeof item.toppings === 'string' ? JSON.parse(item.toppings) : item.toppings;
+  } else {
+    availableToppings = [
+      { name: 'Extra Cheese', price: 40 },
+      { name: 'Garlic Butter Dip', price: 25 },
+      { name: 'Crispy Fried Garlic', price: 20 }
+    ];
+  }
+
   const [selectedVariant, setSelectedVariant] = useState(
-    item.variants && item.variants.length > 0 ? item.variants[0] : null
+    parsedVariants && parsedVariants.length > 0 ? parsedVariants[0] : null
   );
   const [spiceLevel, setSpiceLevel] = useState(item.spice_level || 'medium');
   const [selectedToppings, setSelectedToppings] = useState([]);
   const [fulfillmentType, setFulfillmentType] = useState('dine_in'); // 'dine_in' or 'packing'
   const [quantity, setQuantity] = useState(1);
-
-  // Available toppings presets
-  const availableToppings = [
-    { name: 'Extra Cheese', price: 40 },
-    { name: 'Garlic Butter Dip', price: 25 },
-    { name: 'Crispy Fried Garlic', price: 20 },
-  ];
 
   const toggleTopping = (topping) => {
     if (selectedToppings.some(t => t.name === topping.name)) {
@@ -92,15 +106,15 @@ export const ItemCustomizationModal = ({ item, isOpen, onClose, onAddToCart }) =
         </div>
 
         {/* Variants Selection */}
-        {item.variants && item.variants.length > 0 && (
+        {parsedVariants && parsedVariants.length > 0 && (
           <div style={{ marginBottom: '1.25rem' }}>
             <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
               Select Size / Portion:
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {item.variants.map(variant => (
+              {parsedVariants.map((variant, vIdx) => (
                 <label
-                  key={variant.name}
+                  key={vIdx}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -119,10 +133,12 @@ export const ItemCustomizationModal = ({ item, isOpen, onClose, onAddToCart }) =
                       checked={selectedVariant?.name === variant.name}
                       onChange={() => setSelectedVariant(variant)}
                     />
-                    <span style={{ fontWeight: 600 }}>{variant.name}</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {variant.name} {variant.pieces ? `(${variant.pieces} Pcs)` : ''}
+                    </span>
                   </div>
                   <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>
-                    {formatCurrency(item.price + variant.price_modifier)}
+                    {formatCurrency(item.price + (variant.price_modifier || 0))}
                   </span>
                 </label>
               ))}

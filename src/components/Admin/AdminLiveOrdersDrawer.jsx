@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { fetchAPI } from '../../utils/api';
 import { formatCurrency } from '../../utils/formatters';
 import { Clock, Filter, ShoppingBag, Calendar, Eye, RefreshCw } from 'lucide-react';
+import { SocketContext } from '../../context/SocketContext';
 
 export const AdminLiveOrdersDrawer = () => {
+  const { socket } = useContext(SocketContext);
   const [orders, setOrders] = useState([]);
   const [selectedTableFilter, setSelectedTableFilter] = useState('all');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10)); // Default today's YYYY-MM-DD
@@ -26,6 +28,19 @@ export const AdminLiveOrdersDrawer = () => {
     const interval = setInterval(loadOrders, 10000); // Auto-refresh every 10s
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleUpdate = () => loadOrders();
+    socket.on('new_order', handleUpdate);
+    socket.on('order_status_updated', handleUpdate);
+    socket.on('item_status_updated', handleUpdate);
+    return () => {
+      socket.off('new_order', handleUpdate);
+      socket.off('order_status_updated', handleUpdate);
+      socket.off('item_status_updated', handleUpdate);
+    };
+  }, [socket]);
 
   // Filter by Date (YYYY-MM-DD)
   let filteredOrders = orders.filter(o => {

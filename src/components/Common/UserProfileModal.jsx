@@ -70,7 +70,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{user.name} ({user.role ? user.role.toUpperCase() : 'STAFF'})</div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Logged in as: <strong>{user.username}</strong></span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}><strong>{user.username}</strong></span>
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            Full Name: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+            Full Name: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}></span>
           </label>
           <div style={{ position: 'relative' }}>
             <User size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -96,7 +96,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            System / Work Email: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+            System / Work Email: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}></span>
           </label>
           <div style={{ position: 'relative' }}>
             <Mail size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -113,7 +113,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            Personal Email: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+            Personal Email: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}></span>
           </label>
           <div style={{ position: 'relative' }}>
             <Mail size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -130,7 +130,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            Username (Sign-in ID): <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+            Username (Sign-in ID): <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}></span>
           </label>
           <div style={{ position: 'relative' }}>
             <Lock size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -147,7 +147,7 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
 
         <div>
           <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-            New Password: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+            New Password: <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}></span>
           </label>
           <div style={{ position: 'relative' }}>
             <Key size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />

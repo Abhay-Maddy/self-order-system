@@ -12,6 +12,7 @@ export const CheckoutModal = ({
   cart = [],
   tableNumber,
   appliedCoupon,
+  activeOrder,
   onPlaceOrderSuccess
 }) => {
   const { t } = useContext(LanguageContext);
@@ -25,6 +26,12 @@ export const CheckoutModal = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('idle'); // 'idle', 'verifying', 'success'
+
+  useEffect(() => {
+    if (activeOrder && activeOrder.customer_phone) {
+      setCustomerPhone(activeOrder.customer_phone);
+    }
+  }, [activeOrder, isOpen]);
 
   const safeCart = Array.isArray(cart) ? cart : [];
   const subtotal = safeCart.reduce((sum, item) => sum + (item.total_price || 0), 0);

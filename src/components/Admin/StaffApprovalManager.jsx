@@ -11,6 +11,8 @@ export const StaffApprovalManager = () => {
   const [newUser, setNewUser] = useState({
     username: '',
     email: '',
+    personal_email: '',
+    phone: '',
     name: '',
     password: '',
     role: 'chef'
@@ -19,6 +21,8 @@ export const StaffApprovalManager = () => {
   const [editFormData, setEditFormData] = useState({
     name: '',
     email: '',
+    personal_email: '',
+    phone: '',
     username: '',
     role: 'chef',
     status: 'approved',
@@ -79,7 +83,7 @@ export const StaffApprovalManager = () => {
         body: JSON.stringify(newUser)
       });
       setSuccessMsg(res.message);
-      setNewUser({ username: '', email: '', name: '', password: '', role: 'chef' });
+      setNewUser({ username: '', email: '', personal_email: '', phone: '', name: '', password: '', role: 'chef' });
       setIsAddUserOpen(false);
       loadStaff();
     } catch (err) {
@@ -92,6 +96,8 @@ export const StaffApprovalManager = () => {
     setEditFormData({
       name: userObj.name || '',
       email: userObj.email || '',
+      personal_email: userObj.personal_email || '',
+      phone: userObj.phone || '',
       username: userObj.username || '',
       role: userObj.role || 'chef',
       status: userObj.status || 'approved',
@@ -125,7 +131,7 @@ export const StaffApprovalManager = () => {
             Main Admin Governance & User Accounts
           </h2>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Manage Admin, Chef & Cashier/Waiter usernames, passwords, emails & credentials
+            Manage Admin, Chef, Cashier & Waiter credentials, mobile numbers, personal & company emails
           </span>
         </div>
 
@@ -151,12 +157,21 @@ export const StaffApprovalManager = () => {
 
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Username</label>
-              <input type="text" required value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} className="input-field" placeholder="e.g. admin2 or chef3" />
-            </div>
-
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Email Address</label>
-              <input type="email" required value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} className="input-field" placeholder="user@aamantran.com" />
+              <input
+                type="text"
+                required
+                value={newUser.username}
+                onChange={e => {
+                  const val = e.target.value;
+                  setNewUser({
+                    ...newUser,
+                    username: val,
+                    email: val ? `${val}@aamantran.com` : ''
+                  });
+                }}
+                className="input-field"
+                placeholder="e.g. cashier2 or chef3"
+              />
             </div>
 
             <div>
@@ -165,12 +180,27 @@ export const StaffApprovalManager = () => {
             </div>
 
             <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Mobile Phone Number</label>
+              <input type="tel" required value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} className="input-field" placeholder="+91 98765 43210" />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Personal Gmail (Optional)</label>
+              <input type="email" value={newUser.personal_email} onChange={e => setNewUser({ ...newUser, personal_email: e.target.value })} className="input-field" placeholder="user@gmail.com" />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Company Email (@aamantran.com)</label>
+              <input type="email" required value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} className="input-field" placeholder="user@aamantran.com" />
+            </div>
+
+            <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Role</label>
               <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="input-field">
-                <option value="chef">Kitchen / Chef</option>
-                <option value="cashier">Waiter / Floor Staff</option>
-                <option value="admin">Owner / Admin</option>
-                <option value="cashier">Billing / Cashier</option>
+                <option value="admin">📊 Owner / Admin</option>
+                <option value="cashier">💳 Billing / Cashier</option>
+                <option value="chef">👨‍🍳 Kitchen / Chef</option>
+                <option value="waiter">🤵 Waiter / Floor Staff</option>
               </select>
             </div>
 
@@ -191,23 +221,36 @@ export const StaffApprovalManager = () => {
               <input type="text" required value={editFormData.name} onChange={e => setEditFormData({ ...editFormData, name: e.target.value })} className="input-field" />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Email Address:</label>
-              <input type="email" required value={editFormData.email} onChange={e => setEditFormData({ ...editFormData, email: e.target.value })} className="input-field" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Company Email:</label>
+                <input type="email" required value={editFormData.email} onChange={e => setEditFormData({ ...editFormData, email: e.target.value })} className="input-field" placeholder="user@aamantran.com" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Personal Gmail:</label>
+                <input type="email" value={editFormData.personal_email} onChange={e => setEditFormData({ ...editFormData, personal_email: e.target.value })} className="input-field" placeholder="user@gmail.com" />
+              </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Username:</label>
-              <input type="text" required value={editFormData.username} onChange={e => setEditFormData({ ...editFormData, username: e.target.value })} className="input-field" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Username:</label>
+                <input type="text" required value={editFormData.username} onChange={e => setEditFormData({ ...editFormData, username: e.target.value })} className="input-field" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Mobile Phone Number:</label>
+                <input type="tel" required value={editFormData.phone} onChange={e => setEditFormData({ ...editFormData, phone: e.target.value })} className="input-field" placeholder="+91 98765 43210" />
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Role:</label>
                 <select value={editFormData.role} onChange={e => setEditFormData({ ...editFormData, role: e.target.value })} className="input-field" disabled={editingUser.is_main_admin === 1}>
-                  <option value="chef">Kitchen / Chef</option>
-                  <option value="cashier">Waiter / Floor Staff</option>
-                  <option value="admin">Owner / Admin</option>
+                  <option value="chef">👨‍🍳 Kitchen / Chef</option>
+                  <option value="cashier">💳 Billing / Cashier</option>
+                  <option value="waiter">🤵 Waiter / Floor Staff</option>
+                  <option value="admin">📊 Owner / Admin</option>
                 </select>
               </div>
 
@@ -239,8 +282,8 @@ export const StaffApprovalManager = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-              <th style={{ padding: '0.75rem' }}>Name & Email</th>
-              <th style={{ padding: '0.75rem' }}>Username</th>
+              <th style={{ padding: '0.75rem' }}>Name & Emails</th>
+              <th style={{ padding: '0.75rem' }}>Phone & Username</th>
               <th style={{ padding: '0.75rem' }}>Role</th>
               <th style={{ padding: '0.75rem' }}>Status</th>
               <th style={{ padding: '0.75rem', textAlign: 'right' }}>Actions</th>
@@ -256,11 +299,19 @@ export const StaffApprovalManager = () => {
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                     <Mail size={12} /> {s.email || `${s.username}@aamantran.com`}
                   </div>
+                  {s.personal_email && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--brand-primary)' }}>
+                      Personal: {s.personal_email}
+                    </div>
+                  )}
                 </td>
-                <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{s.username}</td>
+                <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontWeight: 700 }}>{s.username}</div>
+                  {s.phone && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>📞 {s.phone}</div>}
+                </td>
                 <td style={{ padding: '0.75rem' }}>
                   <span className="badge badge-dinein" style={{ textTransform: 'capitalize' }}>
-                    {s.role === 'cashier' ? 'Cashier / Waiter' : s.role}
+                    {s.role === 'cashier' ? '💳 Cashier' : s.role === 'chef' ? '👨‍🍳 Chef' : s.role === 'waiter' ? '🤵 Waiter' : '📊 Admin'}
                   </span>
                 </td>
                 <td style={{ padding: '0.75rem' }}>

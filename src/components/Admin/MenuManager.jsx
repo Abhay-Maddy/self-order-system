@@ -40,12 +40,23 @@ export const MenuManager = () => {
     description: '',
     price: 100,
     is_veg: true,
+    dietary_type: 'veg', // 'veg', 'nonveg', 'egg', 'vegan', 'none'
     is_vegan: false,
     is_gluten_free: false,
     spice_level: 'medium',
     image_url: '',
     stock_quantity: 50,
-    low_stock_threshold: 5
+    low_stock_threshold: 5,
+    has_customization: false,
+    variants: [
+      { name: 'Half', price_modifier: 0, pieces: 4 },
+      { name: 'Full', price_modifier: 80, pieces: 8 }
+    ],
+    toppings: [
+      { name: 'Extra Cheese', price: 30 },
+      { name: 'Garlic Butter', price: 20 },
+      { name: 'Crispy Fries', price: 40 }
+    ]
   });
 
   const loadMenu = () => {
@@ -86,19 +97,48 @@ export const MenuManager = () => {
       description: '',
       price: 150,
       is_veg: true,
+      dietary_type: 'veg',
       is_vegan: false,
       is_gluten_free: false,
       spice_level: 'medium',
       image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600',
       stock_quantity: 40,
       low_stock_threshold: 5,
-      has_customization: false
+      has_customization: false,
+      variants: [
+        { name: 'Half', price_modifier: 0, pieces: 4 },
+        { name: 'Full', price_modifier: 80, pieces: 8 }
+      ],
+      toppings: [
+        { name: 'Extra Cheese', price: 30 },
+        { name: 'Garlic Butter', price: 20 },
+        { name: 'Crispy Fries', price: 40 }
+      ]
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (item) => {
     setEditingItem(item);
+    let parsedVariants = [
+      { name: 'Half', price_modifier: 0, pieces: 4 },
+      { name: 'Full', price_modifier: 80, pieces: 8 }
+    ];
+    let parsedToppings = [
+      { name: 'Extra Cheese', price: 30 },
+      { name: 'Garlic Butter', price: 20 },
+      { name: 'Crispy Fries', price: 40 }
+    ];
+
+    if (item.variants) {
+      parsedVariants = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants;
+    }
+    if (item.toppings) {
+      parsedToppings = typeof item.toppings === 'string' ? JSON.parse(item.toppings) : item.toppings;
+    }
+
+    const dType = item.dietary_type || (item.is_veg ? 'veg' : 'nonveg');
+
     setFormData({
       subcategory_id: item.subcategory_id,
       name: item.name,
@@ -107,13 +147,16 @@ export const MenuManager = () => {
       description: item.description || '',
       price: item.price,
       is_veg: Boolean(item.is_veg),
+      dietary_type: dType,
       is_vegan: Boolean(item.is_vegan),
       is_gluten_free: Boolean(item.is_gluten_free),
       spice_level: item.spice_level || 'medium',
       image_url: item.image_url || '',
       stock_quantity: item.stock_quantity,
       low_stock_threshold: item.low_stock_threshold,
-      has_customization: Boolean(item.has_customization)
+      has_customization: Boolean(item.has_customization),
+      variants: parsedVariants,
+      toppings: parsedToppings
     });
     setIsModalOpen(true);
   };
@@ -357,9 +400,14 @@ export const MenuManager = () => {
                   </td>
                   <td style={{ padding: '0.75rem', fontSize: '0.85rem', fontWeight: 700 }}>{catName}</td>
                   <td style={{ padding: '0.75rem' }}>
-                    <span className={`badge ${item.is_veg ? 'badge-veg' : 'badge-nonveg'}`} style={{ marginRight: '0.3rem' }}>
-                      {item.is_veg ? 'VEG' : 'NON-VEG'}
-                    </span>
+                    {item.dietary_type !== 'none' && (
+                      <span
+                        className={`badge ${item.dietary_type === 'nonveg' ? 'badge-nonveg' : 'badge-veg'}`}
+                        style={{ marginRight: '0.3rem', fontSize: '0.72rem' }}
+                      >
+                        {item.dietary_type === 'nonveg' ? '🔴 NON-VEG' : item.dietary_type === 'egg' ? '🥚 EGG' : item.dietary_type === 'vegan' ? '🌱 VEGAN' : '🟢 VEG'}
+                      </span>
+                    )}
                     {typeof item.tags === 'string' && item.tags.trim() && item.tags.split(',').map((t, i) => (
                       <span key={i} className="badge" style={{ background: 'var(--bg-surface-elevated)', marginRight: '0.2rem', fontSize: '0.7rem' }}>
                         {t.trim()}
@@ -372,13 +420,25 @@ export const MenuManager = () => {
                   <td style={{ padding: '0.75rem', fontWeight: 600 }}>
                     {item.stock_quantity}
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                    <button onClick={() => handleOpenEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: '0.4rem' }}>
-                      <Edit size={14} />
-                    </button>
-                    <button onClick={() => handleDeleteItem(item.id)} className="btn btn-danger btn-sm">
-                      <Trash2 size={14} />
-                    </button>
+                  <td style={{ padding: '0.75rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <button
+                        onClick={() => handleOpenEdit(item)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                        title="Edit Dish & Customizations"
+                      >
+                        <Edit size={14} /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="btn btn-danger btn-sm"
+                        style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', gap: '0.3rem' }}
+                        title="Delete Dish"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -493,10 +553,24 @@ export const MenuManager = () => {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Dietary Type</label>
-              <select className="input-field" value={formData.is_veg ? 'veg' : 'nonveg'} onChange={(e) => setFormData({ ...formData, is_veg: e.target.value === 'veg' })}>
+              <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Dietary Type Tag</label>
+              <select
+                className="input-field"
+                value={formData.dietary_type || (formData.is_veg ? 'veg' : 'nonveg')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({
+                    ...formData,
+                    dietary_type: val,
+                    is_veg: val === 'veg' || val === 'vegan'
+                  });
+                }}
+              >
                 <option value="veg">🟢 Veg</option>
                 <option value="nonveg">🔴 Non-Veg</option>
+                <option value="egg">🥚 Contains Egg</option>
+                <option value="vegan">🌱 Vegan</option>
+                <option value="none">⚪ None (No Badge Shown)</option>
               </select>
             </div>
           </div>
@@ -511,17 +585,156 @@ export const MenuManager = () => {
             <textarea className="input-field" rows="2" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}></textarea>
           </div>
 
-          <div style={{ background: 'var(--bg-surface-elevated)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Enable Customization Modal</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>If enabled, clicking '+ Add' opens customization. If disabled, directly adds to cart.</div>
+          {/* CUSTOMIZATION OPTIONS BUILDER */}
+          <div style={{ background: 'var(--bg-surface-elevated)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--brand-primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--brand-primary)' }}>Enable Customization Modal &amp; Options</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>If enabled, diners can choose portion sizes (Half/Full/Large/XL) &amp; extra toppings.</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.has_customization}
+                onChange={(e) => setFormData({ ...formData, has_customization: e.target.checked })}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
             </div>
-            <input
-              type="checkbox"
-              checked={formData.has_customization}
-              onChange={(e) => setFormData({ ...formData, has_customization: e.target.checked })}
-              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-            />
+
+            {formData.has_customization && (
+              <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+                {/* 1. Portion Sizes Builder */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem' }}>📐 Portion / Size Options (Editable):</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        ...formData,
+                        variants: [...(formData.variants || []), { name: 'Large', price_modifier: 120, pieces: 10 }]
+                      })}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                    >
+                      <Plus size={12} /> Add Size
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {(formData.variants || []).map((v, vIdx) => (
+                      <div key={vIdx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.4rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={v.name}
+                          onChange={(e) => {
+                            const newV = [...formData.variants];
+                            newV[vIdx].name = e.target.value;
+                            setFormData({ ...formData, variants: newV });
+                          }}
+                          className="input-field"
+                          placeholder="e.g. Half / Full / Extra Large"
+                          style={{ padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                        />
+                        <input
+                          type="number"
+                          value={v.price_modifier}
+                          onChange={(e) => {
+                            const newV = [...formData.variants];
+                            newV[vIdx].price_modifier = Number(e.target.value);
+                            setFormData({ ...formData, variants: newV });
+                          }}
+                          className="input-field"
+                          placeholder="+₹ Price"
+                          style={{ padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                        />
+                        <input
+                          type="number"
+                          value={v.pieces || 0}
+                          onChange={(e) => {
+                            const newV = [...formData.variants];
+                            newV[vIdx].pieces = Number(e.target.value);
+                            setFormData({ ...formData, variants: newV });
+                          }}
+                          className="input-field"
+                          placeholder="Pcs"
+                          style={{ padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newV = formData.variants.filter((_, i) => i !== vIdx);
+                            setFormData({ ...formData, variants: newV });
+                          }}
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: '0.25rem 0.4rem' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Extra Toppings / Add-ons Builder */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem' }}>🧀 Extra Toppings &amp; Add-ons (Editable):</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        ...formData,
+                        toppings: [...(formData.toppings || []), { name: 'Extra Cheese', price: 30 }]
+                      })}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                    >
+                      <Plus size={12} /> Add Topping
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {(formData.toppings || []).map((top, tIdx) => (
+                      <div key={tIdx} style={{ display: 'grid', gridTemplateColumns: '3fr 2fr auto', gap: '0.4rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={top.name}
+                          onChange={(e) => {
+                            const newT = [...formData.toppings];
+                            newT[tIdx].name = e.target.value;
+                            setFormData({ ...formData, toppings: newT });
+                          }}
+                          className="input-field"
+                          placeholder="e.g. Extra Cheese / Garlic Dip"
+                          style={{ padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                        />
+                        <input
+                          type="number"
+                          value={top.price}
+                          onChange={(e) => {
+                            const newT = [...formData.toppings];
+                            newT[tIdx].price = Number(e.target.value);
+                            setFormData({ ...formData, toppings: newT });
+                          }}
+                          className="input-field"
+                          placeholder="+₹ Price"
+                          style={{ padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newT = formData.toppings.filter((_, i) => i !== tIdx);
+                            setFormData({ ...formData, toppings: newT });
+                          }}
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: '0.25rem 0.4rem' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

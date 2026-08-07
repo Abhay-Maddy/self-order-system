@@ -5,15 +5,15 @@ import { generateToken, verifyToken, requireRole } from '../auth.js';
 
 const router = express.Router();
 
-// Register staff account (Chef / Cashier)
+// Register staff account (Chef / Cashier / Waiter / Admin Request)
 router.post('/register', async (req, res) => {
   try {
-    const { username, password, name, role } = req.body;
-    if (!username || !password || !name || !role) {
-      return res.status(400).json({ error: 'All fields are required.' });
+    const { username, password, name, role, personal_email, phone } = req.body;
+    if (!username || !password || !name || !role || !personal_email || !phone) {
+      return res.status(400).json({ error: 'Username, password, name, role, personal Gmail, and mobile phone number are required.' });
     }
-    if (!['chef', 'cashier'].includes(role)) {
-      return res.status(400).json({ error: 'Only chef or cashier registration is allowed.' });
+    if (!['chef', 'cashier', 'waiter', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid staff role specified.' });
     }
 
     const existing = await getQuery('SELECT id FROM users WHERE username = ?', [username]);
@@ -22,10 +22,12 @@ router.post('/register', async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
+    const companyEmail = `${username}@aamantran.com`;
+
     // Requires admin approval by default
     await runQuery(
-      `INSERT INTO users (username, password_hash, name, role, status) VALUES (?, ?, ?, ?, 'pending')`,
-      [username, hash, name, role]
+      `INSERT INTO users (username, email, personal_email, phone, password_hash, name, role, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [username, companyEmail, personal_email.trim(), phone.trim(), hash, name, role]
     );
 
     res.json({ message: 'Registration request submitted! Awaiting Admin approval.' });
@@ -81,25 +83,25 @@ router.get('/me', verifyToken, async (req, res) => {
   }
 });
 
-// Admin: List all users (Admins, Chefs, Cashiers)
+// Admin: List all users (Admins, Chefs, Cashiers, Waiters)
 router.get('/staff', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const staff = await allQuery('SELECT id, username, email, personal_email, name, role, is_main_admin, status, created_at FROM users ORDER BY created_at DESC');
+    const staff = await allQuery('SELECT id, username, email, personal_email, phone, name, role, is_main_admin, status, created_at FROM users ORDER BY created_at DESC');
     res.json(staff);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Admin: Add a new Admin, Chef, or Cashier directly
+// Admin: Add a new Admin, Chef, Cashier, or Waiter directly
 router.post('/add-user', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { username, email, personal_email, password, name, role, status = 'approved' } = req.body;
+    const { username, email, personal_email, phone, password, name, role, status = 'approved' } = req.body;
     if (!username || !password || !name || !role) {
       return res.status(400).json({ error: 'Username, password, name, and role are required.' });
     }
-    if (!['admin', 'chef', 'cashier'].includes(role)) {
-      return res.status(400).json({ error: 'Role must be admin, chef, or cashier.' });
+    if (!['admin', 'chef', 'cashier', 'waiter'].includes(role)) {
+      return res.status(400).json({ error: 'Role must be admin, chef, cashier, or waiter.' });
     }
 
     const existing = await getQuery('SELECT id FROM users WHERE username = ?', [username]);
@@ -112,8 +114,8 @@ router.post('/add-user', verifyToken, requireRole(['admin']), async (req, res) =
     const isMainAdmin = 0; // Only initial admin is main admin by default
 
     await runQuery(
-      `INSERT INTO users (username, email, personal_email, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [username, userEmail, personal_email || '', hash, name, role, isMainAdmin, status]
+      `INSERT INTO users (username, email, personal_email, phone, password_hash, name, role, is_main_admin, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, userEmail, personal_email || '', phone || '', hash, name, role, isMainAdmin, status]
     );
 
     res.json({ message: `Successfully added new ${role}: ${name}` });
@@ -140,10 +142,10 @@ router.delete('/users/:id', verifyToken, requireRole(['admin']), async (req, res
   }
 });
 
-// User: Update own profile (Name, Work Email, Personal Email, Username, Password) — All fields optional
+// User: Update own profile (Name, Work Email, Personal Email, Phone, Username, Password) — All fields optional
 router.put('/profile', verifyToken, async (req, res) => {
   try {
-    const { name, email, personal_email, username, password } = req.body;
+    const { name, email, personal_email, phone, username, password } = req.body;
     const userId = req.user.id;
 
     const currentUser = await getQuery('SELECT * FROM users WHERE id = ?', [userId]);
@@ -155,6 +157,7 @@ router.put('/profile', verifyToken, async (req, res) => {
     const newUsername = (username && username.trim()) ? username.trim() : currentUser.username;
     const newEmail = email !== undefined ? email.trim() : (currentUser.email || '');
     const newPersonalEmail = personal_email !== undefined ? personal_email.trim() : (currentUser.personal_email || '');
+    const newPhone = phone !== undefined ? phone.trim() : (currentUser.phone || '');
 
     // Check if new username is taken by another user
     if (newUsername !== currentUser.username) {
@@ -170,11 +173,11 @@ router.put('/profile', verifyToken, async (req, res) => {
     }
 
     await runQuery(
-      `UPDATE users SET name = ?, email = ?, personal_email = ?, username = ?, password_hash = ? WHERE id = ?`,
-      [newName, newEmail, newPersonalEmail, newUsername, passwordHash, userId]
+      `UPDATE users SET name = ?, email = ?, personal_email = ?, phone = ?, username = ?, password_hash = ? WHERE id = ?`,
+      [newName, newEmail, newPersonalEmail, newPhone, newUsername, passwordHash, userId]
     );
 
-    const updatedUser = await getQuery('SELECT id, username, email, personal_email, name, role, is_main_admin, status FROM users WHERE id = ?', [userId]);
+    const updatedUser = await getQuery('SELECT id, username, email, personal_email, phone, name, role, is_main_admin, status FROM users WHERE id = ?', [userId]);
     const newToken = generateToken(updatedUser);
 
     res.json({
@@ -187,10 +190,10 @@ router.put('/profile', verifyToken, async (req, res) => {
   }
 });
 
-// Admin: Edit any staff member's profile (Name, Email, Username, Role, Status, Password reset)
+// Admin: Edit any staff member's profile (Name, Email, Personal Email, Phone, Username, Role, Status, Password reset)
 router.put('/staff/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { name, email, username, role, status, password } = req.body;
+    const { name, email, personal_email, phone, username, role, status, password } = req.body;
     const targetId = req.params.id;
 
     const targetUser = await getQuery('SELECT * FROM users WHERE id = ?', [targetId]);
@@ -216,10 +219,12 @@ router.put('/staff/:id', verifyToken, requireRole(['admin']), async (req, res) =
     // Don't downgrade main admin role or status
     const newRole = targetUser.is_main_admin === 1 ? 'admin' : (role || targetUser.role);
     const newStatus = targetUser.is_main_admin === 1 ? 'approved' : (status || targetUser.status);
+    const newPersonalEmail = personal_email !== undefined ? personal_email : (targetUser.personal_email || '');
+    const newPhone = phone !== undefined ? phone : (targetUser.phone || '');
 
     await runQuery(
-      `UPDATE users SET name = ?, email = ?, username = ?, role = ?, status = ?, password_hash = ? WHERE id = ?`,
-      [name, email, username, newRole, newStatus, passwordHash, targetId]
+      `UPDATE users SET name = ?, email = ?, personal_email = ?, phone = ?, username = ?, role = ?, status = ?, password_hash = ? WHERE id = ?`,
+      [name, email, newPersonalEmail, newPhone, username, newRole, newStatus, passwordHash, targetId]
     );
 
     res.json({ message: `Staff account '${username}' updated successfully!` });

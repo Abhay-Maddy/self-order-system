@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { LanguageContext } from '../../context/LanguageContext';
 import { AuthContext } from '../../context/AuthContext';
-import { QrCode, Search, ShoppingBag, Menu, History, Sparkles, X, Info, RefreshCw, FileText } from 'lucide-react';
+import { QrCode, Search, ShoppingBag, Menu, History, Sparkles, X, Info, RefreshCw, FileText, LayoutDashboard, SlidersHorizontal, Leaf, ArrowLeft } from 'lucide-react';
 
 export const TableSessionHeader = ({
   selectedTable,
@@ -9,12 +9,17 @@ export const TableSessionHeader = ({
   tables = [],
   searchQuery,
   setSearchQuery,
+  vegOnly,
+  setVegOnly,
+  sortBy,
+  setSortBy,
   cartItemCount,
   onOpenCart,
   activeOrder,
   onOpenOrderTracker,
   onOpenHistory,
-  onOpenBillInvoice
+  onOpenBillInvoice,
+  setActivePanel
 }) => {
   const { t } = useContext(LanguageContext);
   const { user } = useContext(AuthContext);
@@ -33,53 +38,53 @@ export const TableSessionHeader = ({
   return (
     <div className="glass-card" style={{ padding: '0.85rem 1rem', marginBottom: '1.25rem', position: 'relative', zIndex: 50 }}>
       {/* Top Header Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
 
-        {/* RULE 1: Logged-in Staff gets "Switch Table" button in place of table chip */}
-        {user ? (
+        {/* QR Code Scanned Table Badge Chip (Only shown when accessed via QR code parameter) */}
+        {hasTableParam && (
+          <div style={{
+            background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)',
+            color: '#fff',
+            padding: '0.45rem 0.85rem',
+            borderRadius: '9999px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
+            whiteSpace: 'nowrap'
+          }}>
+            <QrCode size={16} />
+            <span>Table #{selectedTable}</span>
+          </div>
+        )}
+
+        {/* Go to Admin Panel Button (Rendered only for logged in staff when NOT accessing via QR code) */}
+        {user && !hasTableParam && setActivePanel && (
           <button
             type="button"
-            onClick={() => setIsTableSelectorOpen(!isTableSelectorOpen)}
-            className="btn btn-secondary"
+            onClick={() => setActivePanel && setActivePanel('admin')}
+            className="btn btn-primary"
             style={{
-              padding: '0.45rem 0.75rem',
-              borderRadius: '9999px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              gap: '0.35rem',
-              borderColor: 'var(--brand-primary)',
-              color: 'var(--brand-primary)',
-              whiteSpace: 'nowrap'
-            }}
-            title="Switch Active Table Number"
-          >
-            <RefreshCw size={14} />
-            <span>{t('switchTable')} {selectedTable ? `(#${selectedTable})` : ''}</span>
-          </button>
-        ) : (
-          /* RULE 2: Non-logged in customer showing QR table param gets ONLY Table Chip (NO switch table) */
-          hasTableParam ? (
-            <div style={{
-              background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)',
-              color: '#fff',
               padding: '0.45rem 0.85rem',
-              borderRadius: '9999px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
+              fontSize: '0.82rem',
               fontWeight: 800,
-              fontSize: '0.85rem',
+              gap: '0.4rem',
+              borderRadius: '10px',
               boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
-              whiteSpace: 'nowrap'
-            }}>
-              <QrCode size={16} />
-              <span>Table #{selectedTable}</span>
-            </div>
-          ) : null /* RULE 3: Non-logged in generic web visitor gets NO table chip & NO switch table button */
+              whiteSpace: 'nowrap',
+              background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)'
+            }}
+            title="Return to Admin Panel"
+          >
+            <LayoutDashboard size={16} />
+            <span>Go to Admin Panel</span>
+          </button>
         )}
 
         {/* Search Box */}
-        <div style={{ flex: 1, position: 'relative' }}>
+        <div style={{ flex: 1, position: 'relative', minWidth: '180px' }}>
           <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
@@ -181,9 +186,9 @@ export const TableSessionHeader = ({
             position: 'absolute',
             right: '0.5rem',
             top: 'calc(100% + 4px)',
-            width: '270px',
+            width: '290px',
             zIndex: 99999,
-            padding: '0.75rem',
+            padding: '0.85rem',
             background: 'var(--bg-surface-elevated)',
             border: '1px solid var(--brand-primary)',
             borderRadius: '12px',
@@ -192,7 +197,7 @@ export const TableSessionHeader = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.4rem 0.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-primary)', textTransform: 'uppercase' }}>
-              TABLE OPTIONS & DETAILS
+              TABLE OPTIONS & SORTING
             </span>
             <button
               onClick={() => setIsMenuOpen(false)}
@@ -250,7 +255,137 @@ export const TableSessionHeader = ({
               </button>
             )}
 
-            {/* 4. Table Info Banner */}
+            {/* 5. Go to Admin Panel Option in Menu (Only for logged in staff when NOT on QR scan) */}
+            {user && !hasTableParam && setActivePanel && (
+              <button
+                onClick={() => { setIsMenuOpen(false); setActivePanel && setActivePanel('admin'); }}
+                className="btn btn-secondary"
+                style={{ width: '100%', justifyContent: 'flex-start', gap: '0.6rem', padding: '0.65rem 0.85rem', borderColor: 'var(--brand-primary)', fontWeight: 700 }}
+              >
+                <LayoutDashboard size={18} style={{ color: 'var(--brand-primary)' }} />
+                <span>Go to Admin Panel</span>
+              </button>
+            )}
+
+            {/* 6. Comprehensive Sort & Filter Options */}
+            <div style={{ marginTop: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <SlidersHorizontal size={13} style={{ color: 'var(--brand-primary)' }} />
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    SORT EVERYTHING
+                  </span>
+                </div>
+                {((sortBy && sortBy !== 'default') || (vegOnly && vegOnly !== 'all')) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (setSortBy) setSortBy('default');
+                      if (setVegOnly) setVegOnly(false);
+                    }}
+                    style={{
+                      background: 'var(--danger-bg)',
+                      color: 'var(--danger)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.2rem 0.45rem',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.2rem'
+                    }}
+                    title="Remove all sorting and reset menu filters"
+                  >
+                    <X size={12} />
+                    <span>Remove Sort</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Active Sort Banner */}
+              {((sortBy && sortBy !== 'default') || (vegOnly && vegOnly !== 'all')) && (
+                <div style={{ padding: '0.4rem 0.6rem', background: 'rgba(249, 115, 22, 0.1)', border: '1px solid var(--brand-primary)', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>
+                    Active: {sortBy === 'price_low' ? '💰 Price Low-High' : sortBy === 'price_high' ? '💎 Price High-Low' : sortBy === 'name' ? '🔤 Name (A-Z)' : 'Filtered'} {(vegOnly === 'veg' || vegOnly === true) ? '• 🟢 Veg Only' : vegOnly === 'non_veg' ? '• 🔴 Non-Veg Only' : ''}
+                  </span>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
+                <button
+                  type="button"
+                  onClick={() => { if (setSortBy) setSortBy('price_low'); }}
+                  className={`btn btn-sm ${sortBy === 'price_low' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.75rem', padding: '0.4rem 0.2rem', justifyContent: 'center' }}
+                >
+                  💰 Price Low-High
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { if (setSortBy) setSortBy('price_high'); }}
+                  className={`btn btn-sm ${sortBy === 'price_high' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.75rem', padding: '0.4rem 0.2rem', justifyContent: 'center' }}
+                >
+                  💎 Price High-Low
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { if (setSortBy) setSortBy('name'); }}
+                  className={`btn btn-sm ${sortBy === 'name' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.75rem', padding: '0.4rem 0.2rem', justifyContent: 'center' }}
+                >
+                  🔤 Name (A-Z)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { if (setSortBy) setSortBy('default'); }}
+                  className={`btn btn-sm ${sortBy === 'default' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '0.75rem', padding: '0.4rem 0.2rem', justifyContent: 'center' }}
+                >
+                  ✨ Default Menu
+                </button>
+              </div>
+
+              {/* Dietary Food Type Filter Options (All, Veg Only, Non-Veg Only) */}
+              {setVegOnly && (
+                <div style={{ marginTop: '0.6rem', background: 'var(--bg-surface)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <Leaf size={12} color="var(--success)" />
+                    <span>DIETARY TYPE FILTER</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.3rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setVegOnly(false)}
+                      className={`btn btn-sm ${(!vegOnly || vegOnly === 'all') ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.72rem', padding: '0.35rem 0.1rem', justifyContent: 'center' }}
+                    >
+                      🍽️ All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVegOnly('veg')}
+                      className={`btn btn-sm ${(vegOnly === 'veg' || vegOnly === true) ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.72rem', padding: '0.35rem 0.1rem', justifyContent: 'center', borderColor: 'var(--success)' }}
+                    >
+                      🟢 Veg
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVegOnly('non_veg')}
+                      className={`btn btn-sm ${vegOnly === 'non_veg' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.72rem', padding: '0.35rem 0.1rem', justifyContent: 'center', borderColor: 'var(--danger)' }}
+                    >
+                      🔴 Non-Veg
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Table Info Banner */}
             <div style={{ marginTop: '0.4rem', padding: '0.5rem 0.75rem', background: 'var(--bg-surface)', borderRadius: '8px', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Info size={14} color="var(--brand-primary)" />
               <span>Self-Ordering Active {selectedTable ? `for Table #${selectedTable}` : ''}</span>
@@ -261,3 +396,4 @@ export const TableSessionHeader = ({
     </div>
   );
 };
+

@@ -13,7 +13,7 @@ import { AamantranSplash } from './AamantranSplash';
 import { BottomCartBar } from './BottomCartBar';
 import { WelcomeLanding } from './WelcomeLanding';
 import { Modal } from '../Common/Modal';
-import { Printer, Download, FileText } from 'lucide-react';
+import { Printer, Download, FileText, LayoutDashboard, X } from 'lucide-react';
 import { formatCurrency, formatTime } from '../../utils/formatters';
 import { fetchAPI } from '../../utils/api';
 import { SocketContext } from '../../context/SocketContext';
@@ -22,7 +22,7 @@ import { safeStorage, safeSessionStorage } from '../../utils/storage';
 import { PageSkeleton } from '../Common/PageSkeleton';
 
 
-export const CustomerPanel = () => {
+export const CustomerPanel = ({ setActivePanel }) => {
   const { socket, joinRoom } = useContext(SocketContext);
   const { user } = useContext(AuthContext);
   // Show splash ONLY ONCE per session on first load
@@ -143,26 +143,74 @@ export const CustomerPanel = () => {
     };
   }, [socket, activeOrder, selectedTable]);
 
-  // Filter items
+  const [sortBy, setSortBy] = useState('default'); // 'default', 'price_low', 'price_high', 'name'
+
+  // Comprehensive Filter & Search logic
   const filteredItems = allItems.filter(item => {
-    if (vegOnly && item.is_veg !== 1) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = item.name.toLowerCase().includes(q);
-      const matchDesc = item.description && item.description.toLowerCase().includes(q);
-      if (!matchName && !matchDesc) return false;
+    // 1. Dietary Type Filter (All / Veg Only / Non-Veg Only)
+    if (vegOnly === 'veg' || vegOnly === true) {
+      if (item.is_veg !== 1) return false;
+    } else if (vegOnly === 'non_veg') {
+      if (item.is_veg === 1) return false;
     }
+
+    // 2. Multi-field Search Filter (Dish Name, Subtitle, Description, Tags, Category, Subcategory, Dietary Tags)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+
+      const matchName = item.name && item.name.toLowerCase().includes(q);
+      const matchSubtitle = item.subtitle && item.subtitle.toLowerCase().includes(q);
+      const matchDesc = item.description && item.description.toLowerCase().includes(q);
+      const matchTags = item.tags && item.tags.toLowerCase().includes(q);
+      const matchSpice = item.spice_level && item.spice_level.toLowerCase().includes(q);
+
+      // Match Category Name & Subcategory Name
+      let matchCat = false;
+      const catObj = categories.find(c => String(c.id) === String(item.category_id));
+      if (catObj) {
+        if (catObj.name && catObj.name.toLowerCase().includes(q)) matchCat = true;
+        const subObj = (catObj.subcategories || []).find(s => String(s.id) === String(item.subcategory_id));
+        if (subObj && subObj.name && subObj.name.toLowerCase().includes(q)) matchCat = true;
+      }
+      if (item.category_name && item.category_name.toLowerCase().includes(q)) matchCat = true;
+      if (item.subcategory_name && item.subcategory_name.toLowerCase().includes(q)) matchCat = true;
+
+      // Match Dietary Type Tags directly in Search Box
+      let matchDietary = false;
+      if (['veg', 'vegetarian', 'pure veg', 'pure-veg'].includes(q)) {
+        if (item.is_veg === 1) matchDietary = true;
+      }
+      if (['non veg', 'nonveg', 'non-veg', 'chicken', 'mutton', 'fish', 'egg'].includes(q)) {
+        if (item.is_veg === 0) matchDietary = true;
+      }
+      if (q === 'vegan' && (item.is_vegan === 1 || (item.tags && item.tags.toLowerCase().includes('vegan')))) {
+        matchDietary = true;
+      }
+      if ((q === 'gluten free' || q === 'gluten-free') && (item.is_gluten_free === 1 || (item.tags && item.tags.toLowerCase().includes('gluten')))) {
+        matchDietary = true;
+      }
+
+      if (!matchName && !matchSubtitle && !matchDesc && !matchTags && !matchSpice && !matchCat && !matchDietary) {
+        return false;
+      }
+    }
+
     if (activeCategory !== 'all') {
       const catObj = categories.find(c => String(c.id) === String(activeCategory));
       if (catObj) {
+        const catNameLower = catObj.name.toLowerCase();
         const subcatIds = (catObj.subcategories || []).map(s => String(s.id));
         const matchesCategory = String(item.category_id) === String(activeCategory);
         const matchesSubcategory = subcatIds.includes(String(item.subcategory_id));
-        
+        const matchesTags = item.tags && item.tags.toLowerCase().includes(catNameLower);
+
         if (activeSubcat !== 'all') {
-          if (String(item.subcategory_id) !== String(activeSubcat)) return false;
+          const subObj = (catObj.subcategories || []).find(s => String(s.id) === String(activeSubcat));
+          const subNameLower = subObj ? subObj.name.toLowerCase() : '';
+          const matchesSubTag = subNameLower && item.tags && item.tags.toLowerCase().includes(subNameLower);
+          if (String(item.subcategory_id) !== String(activeSubcat) && !matchesSubTag) return false;
         } else {
-          if (!matchesCategory && !matchesSubcategory) return false;
+          if (!matchesCategory && !matchesSubcategory && !matchesTags) return false;
         }
       } else {
         if (String(item.subcategory_id) !== String(activeCategory) && String(item.category_id) !== String(activeCategory)) {
@@ -173,14 +221,70 @@ export const CustomerPanel = () => {
     return true;
   });
 
+  const displayedItems = [...filteredItems].sort((a, b) => {
+    if (sortBy === 'price_low') return Number(a.price) - Number(b.price);
+    if (sortBy === 'price_high') return Number(b.price) - Number(a.price);
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    return 0;
+  });
+
   const handleAddToCart = (cartItem) => {
-    setCart([...cart, cartItem]);
+    const newItem = {
+      ...cartItem,
+      cart_id: cartItem.cart_id || `cart_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+    };
+    setCart(prevCart => {
+      const existingIdx = prevCart.findIndex(i =>
+        i.id === newItem.id &&
+        JSON.stringify(i.selected_variant) === JSON.stringify(newItem.selected_variant) &&
+        JSON.stringify(i.selected_addons) === JSON.stringify(newItem.selected_addons)
+      );
+
+      if (existingIdx > -1) {
+        const updated = [...prevCart];
+        const newQty = updated[existingIdx].quantity + (newItem.quantity || 1);
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          quantity: newQty,
+          total_price: (updated[existingIdx].unit_price || updated[existingIdx].price) * newQty
+        };
+        return updated;
+      } else {
+        return [...prevCart, newItem];
+      }
+    });
+  };
+
+  const updateQuantity = (cartId, delta) => {
+    setCart(prevCart => {
+      return prevCart.map(item => {
+        if (item.cart_id === cartId) {
+          const newQty = item.quantity + delta;
+          if (newQty <= 0) return null;
+          const unitPrice = item.unit_price || item.price;
+          return {
+            ...item,
+            quantity: newQty,
+            total_price: unitPrice * newQty
+          };
+        }
+        return item;
+      }).filter(Boolean);
+    });
   };
 
   const handlePlaceOrderSuccess = async (orderPayload) => {
+    const formattedPayload = {
+      ...orderPayload,
+      items: (orderPayload.items || []).map(it => ({
+        ...it,
+        item_id: it.item_id || it.id
+      }))
+    };
+
     const createdOrder = await fetchAPI('/orders', {
       method: 'POST',
-      body: JSON.stringify(orderPayload)
+      body: JSON.stringify(formattedPayload)
     });
 
     setActiveOrder(createdOrder);
@@ -240,6 +344,8 @@ export const CustomerPanel = () => {
           setSearchQuery={setSearchQuery}
           vegOnly={vegOnly}
           setVegOnly={setVegOnly}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
           cartItemCount={cart.reduce((sum, i) => sum + i.quantity, 0)}
           onOpenCart={() => setIsCartOpen(true)}
           activeOrder={activeOrder}
@@ -252,6 +358,7 @@ export const CustomerPanel = () => {
               setIsHistoryOpen(true);
             }
           }}
+          setActivePanel={setActivePanel}
         />
 
         {/* Inline Active Order Status Bar — Top of Menu Section */}
@@ -259,6 +366,72 @@ export const CustomerPanel = () => {
           activeOrder={activeOrder}
           onOpenOrderTracker={() => setIsOrderTrackerOpen(true)}
         />
+
+        {/* Active Filter & Sorting Pill Indicator */}
+        {(sortBy !== 'default' || (vegOnly && vegOnly !== 'all') || searchQuery) && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--bg-surface-elevated)',
+            border: '1px solid var(--brand-primary)',
+            padding: '0.5rem 0.85rem',
+            borderRadius: '10px',
+            marginBottom: '1rem',
+            fontSize: '0.82rem',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontWeight: 700 }}>
+              <span style={{ color: 'var(--brand-primary)' }}>⚡ Active View:</span>
+              {sortBy !== 'default' && (
+                <span className="badge badge-primary">
+                  Sort: {sortBy === 'price_low' ? '💰 Price Low-High' : sortBy === 'price_high' ? '💎 Price High-Low' : '🔤 Name (A-Z)'}
+                </span>
+              )}
+              {(vegOnly === 'veg' || vegOnly === true) && (
+                <span className="badge badge-veg">
+                  🟢 Veg Only
+                </span>
+              )}
+              {vegOnly === 'non_veg' && (
+                <span className="badge badge-danger" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger)' }}>
+                  🔴 Non-Veg Only
+                </span>
+              )}
+              {searchQuery && (
+                <span className="badge badge-dinein">
+                  🔍 "{searchQuery}"
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSortBy('default');
+                setVegOnly(false);
+                setSearchQuery('');
+              }}
+              style={{
+                background: 'var(--danger-bg)',
+                color: 'var(--danger)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '26px',
+                height: '26px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0,
+                flexShrink: 0,
+                transition: 'transform 0.15s ease'
+              }}
+              title="Remove active sorting & reset view"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {isLoadingMenu ? (
           <PageSkeleton title="Loading Digital Menu..." />
@@ -273,7 +446,7 @@ export const CustomerPanel = () => {
             />
 
             <MenuGrid
-              items={filteredItems}
+              items={displayedItems}
               onSelectItem={(item) => setSelectedItemForModal(item)}
               onDirectAddToCart={(item) => {
                 handleAddToCart({
@@ -301,140 +474,146 @@ export const CustomerPanel = () => {
           onOpenCart={() => setIsCartOpen(true)}
         />
 
-      {/* Modals & Drawers */}
-      <ItemCustomizationModal
-        item={selectedItemForModal}
-        isOpen={Boolean(selectedItemForModal)}
-        onClose={() => setSelectedItemForModal(null)}
-        onAddToCart={handleAddToCart}
-      />
+        {/* Modals & Drawers */}
+        <ItemCustomizationModal
+          item={selectedItemForModal}
+          isOpen={Boolean(selectedItemForModal)}
+          onClose={() => setSelectedItemForModal(null)}
+          onAddToCart={handleAddToCart}
+        />
 
-      <CartDrawer
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cart={cart}
-        setCart={setCart}
-        appliedCoupon={appliedCoupon}
-        setAppliedCoupon={setAppliedCoupon}
-        onProceedToCheckout={() => setIsCheckoutOpen(true)}
-      />
+        <CartDrawer
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          cart={cart}
+          setCart={setCart}
+          appliedCoupon={appliedCoupon}
+          setAppliedCoupon={setAppliedCoupon}
+          onProceedToCheckout={() => setIsCheckoutOpen(true)}
+        />
 
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        cart={cart}
-        tableNumber={selectedTable}
-        appliedCoupon={appliedCoupon}
-        onPlaceOrderSuccess={handlePlaceOrderSuccess}
-      />
+        <CheckoutModal
+          isOpen={isCheckoutOpen}
+          onClose={() => setIsCheckoutOpen(false)}
+          cart={cart}
+          tableNumber={selectedTable}
+          appliedCoupon={appliedCoupon}
+          activeOrder={activeOrder}
+          onPlaceOrderSuccess={handlePlaceOrderSuccess}
+        />
 
-      <OrderTracker
-        order={activeOrder}
-        isOpen={isOrderTrackerOpen}
-        onClose={() => setIsOrderTrackerOpen(false)}
-        onOpenRating={() => setIsRatingOpen(true)}
-        onUpdateOrder={() => {
-          if (activeOrder) {
-            fetchAPI(`/orders/track/${activeOrder.id}`)
-              .then(refreshed => setActiveOrder(refreshed))
-              .catch(err => console.error(err));
-          }
-        }}
-      />
+        <OrderTracker
+          order={activeOrder}
+          isOpen={isOrderTrackerOpen}
+          onClose={() => setIsOrderTrackerOpen(false)}
+          onOpenRating={() => setIsRatingOpen(true)}
+          onUpdateOrder={() => {
+            if (activeOrder) {
+              fetchAPI(`/orders/track/${activeOrder.id}`)
+                .then(refreshed => setActiveOrder(refreshed))
+                .catch(err => console.error(err));
+            }
+          }}
+        />
 
-      <GoogleReviewModal
-        isOpen={isRatingOpen}
-        onClose={() => setIsRatingOpen(false)}
-        orderId={activeOrder?.id}
-      />
+        <GoogleReviewModal
+          isOpen={isRatingOpen}
+          onClose={() => setIsRatingOpen(false)}
+          orderId={activeOrder?.id}
+          order={activeOrder}
+        />
 
-      <OrderHistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        onSelectOrderToTrack={(selectedOrd) => {
-          setActiveOrder(selectedOrd);
-          setIsOrderTrackerOpen(true);
-        }}
-      />
+        <OrderHistoryModal
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          onSelectOrderToTrack={(selectedOrd) => {
+            setActiveOrder(selectedOrd);
+            setIsOrderTrackerOpen(true);
+          }}
+        />
 
-      {/* CUSTOMER BILL INVOICE MODAL */}
-      {isCustomerBillOpen && activeOrder && (
-        <Modal isOpen={isCustomerBillOpen} onClose={() => setIsCustomerBillOpen(false)} title={`Bill Invoice #${activeOrder.order_number}`}>
-          <div>
-            <div style={{ background: '#fff', color: '#000', padding: '1.25rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-              <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '0.6rem', marginBottom: '0.6rem' }}>
-                <h3 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 900 }}>AAMANTRAN RESTAURANT</h3>
-                <div>Tax Invoice & Bill Receipt • Table #{activeOrder.table_number}</div>
-                <div>Date: {new Date(activeOrder.created_at).toLocaleString()}</div>
-                <div>Order Ref: #{activeOrder.order_number}</div>
-              </div>
+        {/* CUSTOMER BILL INVOICE MODAL */}
+        {isCustomerBillOpen && activeOrder && (
+          <Modal isOpen={isCustomerBillOpen} onClose={() => setIsCustomerBillOpen(false)} title={`Bill Invoice #${activeOrder.order_number}`}>
+            <div>
+              <div style={{ background: '#fff', color: '#000', padding: '1.25rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '0.6rem', marginBottom: '0.6rem' }}>
+                  <h3 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 900 }}>AAMANTRAN RESTAURANT</h3>
+                  <div>Tax Invoice & Bill Receipt • Table #{activeOrder.table_number}</div>
+                  <div>Date: {new Date(activeOrder.created_at).toLocaleString()}</div>
+                  <div>Order Ref: #{activeOrder.order_number}</div>
+                </div>
 
-              <table style={{ width: '100%', marginBottom: '0.6rem', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>
-                    <th style={{ padding: '0.25rem 0' }}>Qty & Item</th>
-                    <th style={{ padding: '0.25rem 0', textAlign: 'right' }}>Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(activeOrder.items || []).map((it, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px dotted #ccc' }}>
-                      <td style={{ padding: '0.25rem 0' }}>
-                        {it.quantity}x {it.item_name}
-                        {it.fulfillment_type === 'packing' && ' [PACKING]'}
-                      </td>
-                      <td style={{ padding: '0.25rem 0', textAlign: 'right' }}>
-                        ₹{(it.total_price || 0).toFixed(2)}
-                      </td>
+                <table style={{ width: '100%', marginBottom: '0.6rem', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>
+                      <th style={{ padding: '0.25rem 0' }}>Qty & Item</th>
+                      <th style={{ padding: '0.25rem 0', textAlign: 'right' }}>Price</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(activeOrder.items || []).map((it, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px dotted #ccc' }}>
+                        <td style={{ padding: '0.25rem 0' }}>
+                          {it.quantity}x {it.item_name}
+                          {it.fulfillment_type === 'packing' && ' [PACKING]'}
+                        </td>
+                        <td style={{ padding: '0.25rem 0', textAlign: 'right' }}>
+                          ₹{(it.total_price || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-              <div style={{ borderTop: '1px dashed #000', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.82rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Subtotal:</span>
-                  <span>₹{(activeOrder.total_amount || 0).toFixed(2)}</span>
-                </div>
-                {activeOrder.discount_amount > 0 && (
+                <div style={{ borderTop: '1px dashed #000', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.82rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Discount:</span>
-                    <span>-₹{(activeOrder.discount_amount || 0).toFixed(2)}</span>
+                    <span>Subtotal (Total Revenue):</span>
+                    <span>₹{(activeOrder.total_amount || 0).toFixed(2)}</span>
                   </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>GST Tax (5%):</span>
-                  <span>₹{(activeOrder.tax_amount || 0).toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>CGST (2.5%):</span>
+                    <span>₹{((activeOrder.tax_amount || 0) / 2).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>SGST (2.5%):</span>
+                    <span>₹{((activeOrder.tax_amount || 0) / 2).toFixed(2)}</span>
+                  </div>
+                  {activeOrder.discount_amount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669' }}>
+                      <span>Discount:</span>
+                      <span>-₹{(activeOrder.discount_amount || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '0.95rem', borderTop: '1px solid #000', paddingTop: '0.35rem', marginTop: '0.2rem' }}>
+                    <span>GRAND TOTAL:</span>
+                    <span>₹{(activeOrder.net_amount || 0).toFixed(2)}</span>
+                  </div>
+                  <div style={{ marginTop: '0.35rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+                    Payment: {(activeOrder.payment_mode || 'cash').toUpperCase()} ({(activeOrder.payment_status || 'pending').toUpperCase()})
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '0.95rem', borderTop: '1px solid #000', paddingTop: '0.35rem', marginTop: '0.2rem' }}>
-                  <span>GRAND TOTAL:</span>
-                  <span>₹{(activeOrder.net_amount || 0).toFixed(2)}</span>
-                </div>
-                <div style={{ marginTop: '0.35rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
-                  Payment: {(activeOrder.payment_mode || 'cash').toUpperCase()} ({(activeOrder.payment_status || 'pending').toUpperCase()})
+
+                <div style={{ textAlign: 'center', marginTop: '0.75rem', paddingTop: '0.4rem', borderTop: '1px dashed #000', fontSize: '0.72rem' }}>
+                  Thank you for dining at Aamantran! Visit again soon!
                 </div>
               </div>
 
-              <div style={{ textAlign: 'center', marginTop: '0.75rem', paddingTop: '0.4rem', borderTop: '1px dashed #000', fontSize: '0.72rem' }}>
-                Thank you for dining at Aamantran! Visit again soon!
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                <button onClick={() => setIsCustomerBillOpen(false)} className="btn btn-secondary">Close</button>
+                <button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="btn btn-primary"
+                  style={{ gap: '0.4rem' }}
+                >
+                  <Printer size={16} /> Download / Print Bill
+                </button>
               </div>
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <button onClick={() => setIsCustomerBillOpen(false)} className="btn btn-secondary">Close</button>
-              <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="btn btn-primary"
-                style={{ gap: '0.4rem' }}
-              >
-                <Printer size={16} /> Download / Print Bill
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        )}
       </div>
     </div>
   );

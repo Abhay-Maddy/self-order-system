@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { fetchAPI } from '../../utils/api';
-import { Package, AlertCircle, RefreshCw } from 'lucide-react';
+import { Package, AlertCircle, RefreshCw, Search } from 'lucide-react';
 
 export const InventoryManager = () => {
   const [items, setItems] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadStock = () => {
     fetchAPI('/inventory')
@@ -27,18 +28,40 @@ export const InventoryManager = () => {
     }
   };
 
+  const filteredItems = items.filter(item => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return item.name.toLowerCase().includes(q) || (item.category_name && item.category_name.toLowerCase().includes(q));
+  });
+
   return (
     <div className="glass-card" style={{ padding: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.3rem' }}>Stock & Inventory Monitor</h2>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Real-time inventory levels, low-stock threshold triggers (`K10`, `A7`).
           </span>
         </div>
-        <button onClick={loadStock} className="btn btn-secondary btn-sm">
-          <RefreshCw size={16} /> Sync Stock
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* Left Side Inventory Search Bar */}
+          <div style={{ position: 'relative', width: '240px' }}>
+            <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search stock item..."
+              className="input-field"
+              style={{ paddingLeft: '2.2rem', paddingRight: '0.5rem', height: '36px', fontSize: '0.82rem' }}
+            />
+          </div>
+
+          <button onClick={loadStock} className="btn btn-secondary btn-sm">
+            <RefreshCw size={16} /> Sync Stock
+          </button>
+        </div>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
@@ -53,7 +76,7 @@ export const InventoryManager = () => {
             </tr>
           </thead>
           <tbody>
-            {items.map(item => {
+            {filteredItems.map(item => {
               const isLow = item.stock_quantity <= item.low_stock_threshold && item.stock_quantity > 0;
               const isZero = item.stock_quantity <= 0;
 

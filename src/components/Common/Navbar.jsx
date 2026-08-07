@@ -5,7 +5,7 @@ import { UserProfileModal } from './UserProfileModal';
 import { StaffLoginModal } from './StaffLoginModal';
 import { AuthContext } from '../../context/AuthContext';
 import { LanguageContext } from '../../context/LanguageContext';
-import { Utensils, ChefHat, LayoutDashboard, LogOut, Settings, Lock } from 'lucide-react';
+import { Utensils, ChefHat, LayoutDashboard, LogOut, Settings, Lock, UserCheck } from 'lucide-react';
 
 export const Navbar = ({ activePanel, setActivePanel }) => {
   const { user, logout } = useContext(AuthContext);
@@ -46,58 +46,7 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
           </div>
         </div>
 
-        {/* Panel Switcher Nav - Role-based options */}
-        {user ? (
-          <nav style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-surface-elevated)', padding: '0.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-            {/* Customer Menu: Visible to Waiter, Admin, Cashier — HIDDEN for Chef */}
-            {user.role !== 'chef' && (
-              <button
-                onClick={() => setActivePanel('customer')}
-                className={`btn btn-sm ${activePanel === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ border: 'none', fontSize: '0.85rem' }}
-              >
-                <Utensils size={14} />
-                <span>{t('customerMenu')}</span>
-              </button>
-            )}
 
-            {/* Kitchen Pass: Available for Chef, Cashier, Waiter — hidden for Admin */}
-            {user.role !== 'admin' && (
-              <button
-                onClick={() => setActivePanel('kitchen')}
-                className={`btn btn-sm ${activePanel === 'kitchen' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ border: 'none', fontSize: '0.85rem' }}
-              >
-                <ChefHat size={14} />
-                <span>{t('kitchenPass')}</span>
-              </button>
-            )}
-
-            {/* Waiter Portal: Visible for Waiter role */}
-            {user.role === 'waiter' && (
-              <button
-                onClick={() => setActivePanel('waiter')}
-                className={`btn btn-sm ${activePanel === 'waiter' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ border: 'none', fontSize: '0.85rem' }}
-              >
-                <UserCheck size={14} />
-                <span>Waiter Portal</span>
-              </button>
-            )}
-
-            {/* Admin Portal: Strictly restricted to Admin & Cashier roles */}
-            {['admin', 'cashier'].includes(user.role) && (
-              <button
-                onClick={() => setActivePanel('admin')}
-                className={`btn btn-sm ${activePanel === 'admin' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ border: 'none', fontSize: '0.85rem' }}
-              >
-                <LayoutDashboard size={14} />
-                <span>{t('adminPortal')}</span>
-              </button>
-            )}
-          </nav>
-        ) : null}
 
         {/* Right Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -118,36 +67,48 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
           <ThemeToggle />
 
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span
-                style={{
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
-                  color: 'var(--brand-primary)',
-                  background: 'var(--bg-surface-elevated)',
-                  padding: '0.35rem 0.75rem',
-                  borderRadius: '20px',
-                  border: '1px solid var(--border-color)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem'
-                }}
-              >
-                <span>👋</span>
-                <span>{user.name || user.username}</span>
-              </span>
-              <button
-                onClick={() => setIsProfileOpen(true)}
-                className="btn btn-secondary btn-sm"
-                title="Edit My Profile & Credentials"
-                style={{ fontSize: '0.8rem', fontWeight: 600, gap: '0.3rem', padding: '0.4rem 0.6rem' }}
-              >
-                <Settings size={14} />
-              </button>
-              <button onClick={logout} className="btn btn-secondary btn-sm" title="Log Out" style={{ padding: '0.4rem 0.6rem' }}>
-                <LogOut size={14} />
-              </button>
-            </div>
+            (() => {
+              const isWaiter = user.role === 'waiter' || (user.name && user.name.toLowerCase().includes('waiter')) || user.username === 'waiter1';
+              const isChef = user.role === 'chef' || (user.name && user.name.toLowerCase().includes('chef')) || user.username === 'chef1';
+              const targetPanel = isWaiter ? 'waiter' : isChef ? 'kitchen' : 'admin';
+
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span
+                    onClick={() => setActivePanel(targetPanel)}
+                    style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      color: 'var(--brand-primary)',
+                      background: 'var(--bg-surface-elevated)',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '20px',
+                      border: '1px solid var(--border-color)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      cursor: 'pointer'
+                    }}
+                    title="Logged in staff user - Click to open your panel"
+                  >
+                    <span>👋</span>
+                    <span>{user.name || user.username}</span>
+                  </span>
+
+                  <button
+                    onClick={() => setIsProfileOpen(true)}
+                    className="btn btn-secondary btn-sm"
+                    title="Edit My Profile & Credentials"
+                    style={{ fontSize: '0.8rem', fontWeight: 600, gap: '0.3rem', padding: '0.4rem 0.6rem' }}
+                  >
+                    <Settings size={14} />
+                  </button>
+                  <button onClick={logout} className="btn btn-secondary btn-sm" title="Log Out" style={{ padding: '0.4rem 0.6rem' }}>
+                    <LogOut size={14} />
+                  </button>
+                </div>
+              );
+            })()
           ) : null}
         </div>
       </div>

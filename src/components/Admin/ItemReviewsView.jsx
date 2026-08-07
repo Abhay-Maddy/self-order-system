@@ -11,6 +11,20 @@ export const ItemReviewsView = () => {
       .catch(err => console.error(err));
   }, []);
 
+  // Customer Satisfaction Card
+  <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+    <div>
+      <h3 style={{ fontSize: '1.1rem', marginBottom: '0.2rem' }}>Customer Satisfaction Rating</h3>
+      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+        Based on {stats.totalReviews} verified post-order diner reviews
+      </p>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--warning-bg)', color: 'var(--warning)', padding: '0.6rem 1.2rem', borderRadius: '9999px', fontWeight: 800, fontSize: '1.25rem' }}>
+      <Star size={24} fill="#f59e0b" />
+      <span>{stats.avgRating} / 5.0</span>
+    </div>
+  </div>
+
   return (
     <div className="glass-card" style={{ padding: '1.5rem' }}>
       <div style={{ marginBottom: '1.25rem' }}>

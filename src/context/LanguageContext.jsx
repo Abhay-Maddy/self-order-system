@@ -16,11 +16,11 @@ const staticDictionary = {
     viewCart: 'View Cart',
     checkout: 'Checkout',
     table: 'Table',
-    total: 'Total',
+    switchTable: 'Switch Table',
     subtotal: 'Subtotal',
     tax: 'GST Tax (5%)',
     discount: 'Discount',
-    grandTotal: 'Grand Total',
+    total: 'Total',
     placeOrder: 'Place Order',
     payCash: 'Pay Cash',
     onlinePayment: 'Online Payment',
@@ -44,11 +44,11 @@ const staticDictionary = {
     viewCart: 'कार्ट देखें',
     checkout: 'चेकआउट',
     table: 'टेबल',
-    total: 'कुल',
+    switchTable: 'टेबल बदलें',
     subtotal: 'उप-कुल',
     tax: 'जीएसटी कर (5%)',
     discount: 'छूट',
-    grandTotal: 'कुल राशि',
+    total: 'कुल राशि',
     placeOrder: 'ऑर्डर दें',
     payCash: 'नकद भुगतान',
     onlinePayment: 'ऑनलाइन भुगतान',
@@ -132,7 +132,7 @@ export const LanguageProvider = ({ children }) => {
       let clean = w.toLowerCase().replace(/[^a-z0-9]/g, '');
       return commonTermsMap[clean] || w;
     });
-    
+
     // If all words mapped locally, return immediately
     let localResult = mappedWords.join(' ');
     if (localResult !== text) {

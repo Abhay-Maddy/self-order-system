@@ -23,7 +23,8 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px' }) 
         overflowY: 'auto',
         background: 'var(--bg-surface)',
         padding: '1.5rem',
-        position: 'relative'
+        position: 'relative',
+        margin: 'auto'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
           <h3 style={{ fontSize: '1.25rem' }}>{title}</h3>

@@ -12,6 +12,8 @@ export const StaffLoginForm = ({ onLoginSuccess, defaultRole = 'chef' }) => {
   const [password, setPassword] = useState(defaultRole === 'admin' ? 'admin123' : 'chef123');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [personalEmail, setPersonalEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -61,13 +63,23 @@ export const StaffLoginForm = ({ onLoginSuccess, defaultRole = 'chef' }) => {
     try {
       const res = await fetchAPI('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ username, email, password, name, role: selectedRole })
+        body: JSON.stringify({
+          username,
+          email: email || `${username}@aamantran.com`,
+          personal_email: personalEmail,
+          phone,
+          password,
+          name,
+          role: selectedRole
+        })
       });
       setSuccessMsg(res.message || 'Staff request submitted! Pending Admin approval.');
       setUsername('');
       setPassword('');
       setName('');
       setEmail('');
+      setPersonalEmail('');
+      setPhone('');
     } catch (err) {
       setErrorMsg(err.message || 'Registration failed');
     } finally {
@@ -253,15 +265,42 @@ export const StaffLoginForm = ({ onLoginSuccess, defaultRole = 'chef' }) => {
 
           <div>
             <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.35rem' }}>
-              Email Address
+              Personal Gmail Address (Mandatory)
+            </label>
+            <input
+              type="email"
+              value={personalEmail}
+              onChange={(e) => setPersonalEmail(e.target.value)}
+              required
+              className="input-field"
+              placeholder="marco@gmail.com"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+              Mobile Phone Number (Mandatory)
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              className="input-field"
+              placeholder="+91 98765 43210"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+              Company Email (@aamantran.com)
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
               className="input-field"
-              placeholder="marco@restaurant.com"
+              placeholder="marco@aamantran.com"
             />
           </div>
 

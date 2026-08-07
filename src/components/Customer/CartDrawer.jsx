@@ -20,15 +20,19 @@ export const CartDrawer = ({
 
   if (!isOpen) return null;
 
-  const updateQuantity = (cartId, delta) => {
+  const removeItem = (targetCartId) => {
+    setCart(cart.filter(item => item.cart_id !== targetCartId));
+  };
+
+  const updateQuantity = (targetCartId, delta) => {
     setCart(cart.map(item => {
-      if (item.cart_id === cartId) {
+      if (item.cart_id === targetCartId) {
         const newQty = item.quantity + delta;
         if (newQty <= 0) return null;
         return {
           ...item,
           quantity: newQty,
-          total_price: item.unit_price * newQty
+          total_price: (item.unit_price || item.price || 0) * newQty
         };
       }
       return item;
@@ -121,11 +125,30 @@ export const CartDrawer = ({
 
                 return (
                   <div key={item.cart_id || item.id} className="glass-card" style={{ padding: '0.9rem', position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>{itemName}</h4>
-                      <span style={{ fontWeight: 800, color: 'var(--brand-primary)' }}>
-                        {formatCurrency(itemPrice)}
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                      <div style={{ flex: 1, paddingRight: '0.5rem' }}>
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>{itemName}</h4>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ fontWeight: 800, color: 'var(--brand-primary)' }}>
+                          {formatCurrency(itemPrice)}
+                        </span>
+                        <button
+                          onClick={() => removeItem(item.cart_id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--danger)',
+                            cursor: 'pointer',
+                            padding: '0.2rem',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          title="Remove this dish from cart"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
 
                     {item.variant_name && (
@@ -214,8 +237,18 @@ export const CartDrawer = ({
             {/* Bill Summary */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.9rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>{t('subtotal')}</span>
+                <span>Subtotal (Total Revenue)</span>
                 <span>{formatCurrency(subtotal)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>CGST (2.5%)</span>
+                <span>{formatCurrency(taxAmount / 2)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>SGST (2.5%)</span>
+                <span>{formatCurrency(taxAmount / 2)}</span>
               </div>
 
               {appliedCoupon && (
@@ -224,11 +257,6 @@ export const CartDrawer = ({
                   <span>-{formatCurrency(discountAmount)}</span>
                 </div>
               )}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>{t('tax')} (5% GST)</span>
-                <span>{formatCurrency(taxAmount)}</span>
-              </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.15rem', color: 'var(--brand-primary)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
                 <span>{t('grandTotal')}</span>

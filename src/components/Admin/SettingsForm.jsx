@@ -37,7 +37,7 @@ export const SettingsForm = () => {
   };
 
   return (
-    <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '650px' }}>
+    <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '650px', margin: '0 auto' }}>
       <div style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '1.3rem' }}>Restaurant & System Settings</h2>
         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>

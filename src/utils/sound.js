@@ -46,3 +46,53 @@ export const playKitchenChime = (tableNumber) => {
     console.warn('Audio chime or voice alert failed:', err);
   }
 };
+
+// Waiter Alert: Haptic Vibration + Urgency Chime + Voice Announcement when Chef marks dish "Ready to Serve"
+export const playWaiterVibrationAndChime = (tableNumber) => {
+  // 1. Mobile / Tablet Haptic Device Vibration
+  try {
+    if ('vibrate' in navigator) {
+      navigator.vibrate([400, 150, 400, 150, 600]);
+    }
+  } catch (e) {
+    console.warn('Vibration API not supported:', e);
+  }
+
+  // 2. Audio Chime (C5 -> E5 -> G5)
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+
+      const freqs = [523.25, 659.25, 783.99];
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+        gain.gain.setValueAtTime(0.5, now + idx * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.15 + 0.4);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.15);
+        osc.stop(now + idx * 0.15 + 0.4);
+      });
+    }
+
+    // 3. Speech Synthesis Announcement
+    if ('speechSynthesis' in window) {
+      setTimeout(() => {
+        const text = tableNumber ? `Dish ready to serve for Table ${tableNumber}` : 'Dish ready to serve';
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.05;
+        utterance.pitch = 1.2;
+        window.speechSynthesis.speak(utterance);
+      }, 450);
+    }
+  } catch (err) {
+    console.warn('Waiter alert chime/speech failed:', err);
+  }
+};
+
