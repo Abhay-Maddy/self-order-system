@@ -6,6 +6,8 @@ import { LanguageContext } from '../../context/LanguageContext';
 import { CreditCard, Banknote, Phone, CheckCircle, ShieldCheck, QrCode, Smartphone, Sparkles, Check, AlertCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 
+import { useIsMobile } from '../../hooks/useIsMobile';
+
 export const CheckoutModal = ({
   isOpen,
   onClose,
@@ -17,6 +19,7 @@ export const CheckoutModal = ({
   onPlaceOrderSuccess
 }) => {
   const { t } = useContext(LanguageContext);
+  const isMobileSmall = useIsMobile(480);
 
   const [paymentMode, setPaymentMode] = useState('online'); // 'online' or 'cash'
   const [onlineOption, setOnlineOption] = useState('upi_qr'); // 'upi_qr', 'upi_id', 'card'
@@ -142,7 +145,7 @@ export const CheckoutModal = ({
           <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.85rem' }}>
             Choose Payment Method:
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.75rem' }}>
             <button
               type="button"
               onClick={() => {
@@ -193,7 +196,7 @@ export const CheckoutModal = ({
         {paymentMode === 'online' && (
           <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.25rem', borderColor: 'var(--brand-primary)' }}>
             {/* 3 Clean Sub-Tabs */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.55rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr 1fr', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.55rem', marginBottom: '1rem' }}>
               <button
                 type="button"
                 onClick={() => setOnlineOption('upi_qr')}
@@ -246,7 +249,7 @@ export const CheckoutModal = ({
                 </div>
 
                 {/* Direct App Launch Buttons under QR */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                   <a
                     href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
                     style={{ background: '#e0f2fe', color: '#0284c7', padding: '0.5rem', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
@@ -281,7 +284,7 @@ export const CheckoutModal = ({
                 <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
                   Tap your app to launch & pay <strong style={{ color: 'var(--brand-primary)' }}>{formatCurrency(grandTotal)}</strong>:
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.6rem' }}>
                   <a
                     href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
                     className="btn btn-secondary"
@@ -318,7 +321,7 @@ export const CheckoutModal = ({
             {onlineOption === 'card' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <input type="text" placeholder="Card Number (4532 •••• •••• 8901)" className="input-field" style={{ fontSize: '0.85rem' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                   <input type="text" placeholder="MM / YY" className="input-field" style={{ fontSize: '0.85rem' }} />
                   <input type="password" placeholder="CVV" className="input-field" style={{ fontSize: '0.85rem' }} />
                 </div>

@@ -309,8 +309,8 @@ export const DashboardOverview = ({ setActivePanel }) => {
 
   return (
     <div>
-      {/* Metric Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+      {/* Metric Cards Grid — Stacks cleanly on mobile (2 cols on tablet/mobile, 4 cols on desktop) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div className="glass-card" style={{ padding: '1rem 1.15rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>{revenueLabel}</span>

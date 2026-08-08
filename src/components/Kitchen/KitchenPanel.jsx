@@ -10,10 +10,12 @@ import { PageSkeleton } from '../Common/PageSkeleton';
 import { StaffLoginView } from '../Common/StaffLoginView';
 import { ChefHat, Printer } from 'lucide-react';
 import { getTodayDateString, formatTime } from '../../utils/formatters';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const KitchenPanel = ({ setActivePanel }) => {
   const { user } = useContext(AuthContext);
   const { socket, joinRoom } = useContext(SocketContext);
+  const isMobile = useIsMobile(768);
 
   const [orders, setOrders] = useState([]);
   const [tables, setTables] = useState([]);
@@ -27,7 +29,7 @@ export const KitchenPanel = ({ setActivePanel }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [tableFilter, setTableFilter] = useState('all');
-  const [sortOrder, setSortOrder] = useState('oldest');
+  const [sortOrder, setSortOrder] = useState('newest');
   const [selectedDate, setSelectedDate] = useState(() => getTodayDateString());
 
   const loadActiveOrders = useCallback(() => {
@@ -133,10 +135,18 @@ export const KitchenPanel = ({ setActivePanel }) => {
   if (tableFilter !== 'all') {
     processedOrders = processedOrders.filter(o => o.table_number === tableFilter);
   }
-  if (sortOrder === 'oldest') {
-    processedOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  if (sortOrder === 'newest') {
+    processedOrders.sort((a, b) => {
+      // Prioritize active kitchen orders (pending/preparing) over completed/ready
+      const aActive = a.items && a.items.some(i => ['pending', 'preparing', 'accepted'].includes(i.status));
+      const bActive = b.items && b.items.some(i => ['pending', 'preparing', 'accepted'].includes(i.status));
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
   } else {
-    processedOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    processedOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   }
 
   const pendingOrders = processedOrders.filter(o => o.items && o.items.some(i => i.status === 'pending'));
@@ -249,7 +259,177 @@ export const KitchenPanel = ({ setActivePanel }) => {
                 {searchQuery ? `No kitchen orders found matching "${searchQuery}"` : 'New orders will appear here in real-time'}
               </p>
             </div>
+          ) : isMobile ? (
+            /* MOBILE STACKED TICKET CARDS (below 768px) */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {processedOrders.map(ord => {
+                const items = ord.items || [];
+                const elapsed = Math.floor((Date.now() - new Date(ord.created_at).getTime()) / 60000);
+                const isOverdue = elapsed > 15;
+                const isSelected = selectedOrderIds.includes(ord.id);
+
+                const allPending = items.filter(i => i.status === 'pending');
+                const allAccepted = items.filter(i => i.status === 'accepted');
+                const allPreparing = items.filter(i => i.status === 'preparing');
+                const allCooling = items.filter(i => i.status === 'cooling');
+                const allReady = items.filter(i => i.status === 'ready');
+
+                let badge = { label: 'ACTIVE', color: 'var(--text-muted)', bg: 'var(--bg-surface-elevated)' };
+                if (items.every(i => ['served', 'rejected'].includes(i.status))) {
+                  badge = { label: '✅ DELIVERED', color: 'var(--success)', bg: 'var(--success-bg)' };
+                } else if (items.some(i => i.status === 'ready')) {
+                  badge = { label: '🔔 READY', color: '#ea580c', bg: 'rgba(249,115,22,0.12)' };
+                } else if (items.some(i => i.status === 'cooling')) {
+                  badge = { label: '❄️ COOLING', color: '#0284c7', bg: '#e0f2fe' };
+                } else if (items.some(i => ['preparing', 'accepted'].includes(i.status))) {
+                  badge = { label: '🔥 COOKING', color: 'var(--warning)', bg: 'var(--warning-bg)' };
+                } else if (items.some(i => i.status === 'pending')) {
+                  badge = { label: '🔴 NEW', color: 'var(--danger)', bg: 'var(--danger-bg)' };
+                }
+
+                return (
+                  <div
+                    key={ord.id}
+                    className="glass-card"
+                    style={{
+                      padding: '0.85rem',
+                      borderLeft: isOverdue ? '4px solid var(--danger)' : '4px solid var(--brand-primary)',
+                      background: isSelected ? 'rgba(234, 88, 12, 0.12)' : (isOverdue ? 'rgba(239,68,68,0.04)' : 'var(--bg-surface)')
+                    }}
+                  >
+                    {/* Mobile Card Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            setSelectedOrderIds(prev =>
+                              prev.includes(ord.id) ? prev.filter(id => id !== ord.id) : [...prev, ord.id]
+                            );
+                          }}
+                          style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                        />
+                        <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--brand-primary)' }}>#{ord.order_number}</span>
+                        <span className="badge badge-dinein" style={{ fontSize: '0.72rem', fontWeight: 800 }}>Table #{ord.table_number}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ fontSize: '0.72rem', color: isOverdue ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 700 }}>
+                          {formatTime(ord.created_at)} ({elapsed}m ago)
+                        </span>
+                        <span style={{ background: badge.bg, color: badge.color, borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, padding: '0.15rem 0.45rem' }}>
+                          {badge.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Mobile Card Items & Touch Buttons (~44px touch targets) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.5rem' }}>
+                      {items.map(item => {
+                        const sc = STATUS_COLORS[item.status] || STATUS_COLORS.pending;
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              background: 'var(--bg-surface-elevated)',
+                              border: `1px solid ${sc.color}30`,
+                              borderLeft: `3px solid ${sc.color}`,
+                              borderRadius: '8px',
+                              padding: '0.55rem 0.65rem'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem', gap: '0.4rem' }}>
+                              <div>
+                                <span style={{ fontWeight: 800, fontSize: '0.88rem' }}>{item.quantity}× {item.item_name}</span>
+                                {item.variant_name && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '4px' }}>({item.variant_name})</span>}
+                                {item.spice_level && <span style={{ fontSize: '0.72rem', color: '#ea580c', marginLeft: '4px', fontWeight: 700 }}>🔥 {item.spice_level}</span>}
+                              </div>
+                              <span style={{ background: sc.bg, color: sc.color, borderRadius: '5px', fontSize: '0.68rem', fontWeight: 800, padding: '0.15rem 0.45rem' }}>
+                                {item.status.toUpperCase()}
+                              </span>
+                            </div>
+
+                            {item.toppings_summary && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>+{item.toppings_summary}</div>}
+                            {item.rejection_reason && <div style={{ fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 700, marginBottom: '0.25rem' }}>Reason: {item.rejection_reason}</div>}
+
+                            {/* Mobile Touch Action Buttons */}
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                              {item.status === 'pending' && (
+                                <>
+                                  <select
+                                    id={`pm-mob-${item.id}`}
+                                    defaultValue="15"
+                                    style={{ padding: '0.4rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-primary)', height: '38px' }}
+                                  >
+                                    <option value="5">5m</option>
+                                    <option value="10">10m</option>
+                                    <option value="15">15m</option>
+                                    <option value="20">20m</option>
+                                    <option value="30">30m</option>
+                                  </select>
+                                  <button
+                                    className="btn btn-success btn-sm"
+                                    style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800 }}
+                                    onClick={() => {
+                                      const el = document.getElementById(`pm-mob-${item.id}`);
+                                      handleItemStatusChange(item.id, 'accepted', null, parseInt(el?.value || 15));
+                                    }}
+                                  >
+                                    ✓ Accept
+                                  </button>
+                                  <button
+                                    className="btn btn-danger btn-sm"
+                                    style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800 }}
+                                    onClick={() => setRejectingItem(item)}
+                                  >
+                                    ✕ Reject
+                                  </button>
+                                </>
+                              )}
+                              {item.status === 'accepted' && (
+                                <button className="btn btn-secondary btn-sm" style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800, background: 'var(--warning)', color: '#fff' }} onClick={() => handleItemStatusChange(item.id, 'preparing')}>🔥 Cook</button>
+                              )}
+                              {item.status === 'preparing' && (
+                                <>
+                                  <button className="btn btn-secondary btn-sm" style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800, background: '#0284c7', color: '#fff' }} onClick={() => handleItemStatusChange(item.id, 'cooling')}>❄️ Cool</button>
+                                  <button className="btn btn-success btn-sm" style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800 }} onClick={() => handleItemStatusChange(item.id, 'ready')}>🔔 Ready</button>
+                                </>
+                              )}
+                              {item.status === 'cooling' && (
+                                <button className="btn btn-success btn-sm" style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800 }} onClick={() => handleItemStatusChange(item.id, 'ready')}>🔔 Ready</button>
+                              )}
+                              {item.status === 'ready' && (
+                                <button className="btn btn-primary btn-sm" style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800, background: '#7c3aed' }} onClick={() => handleItemStatusChange(item.id, 'served')}>🚚 Deliver</button>
+                              )}
+                              {item.status === 'served' && <span style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: 800, alignSelf: 'center' }}>✅ Done</span>}
+                              {item.status === 'rejected' && <span style={{ fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 800, alignSelf: 'center' }}>✕ Rejected</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Mobile Bulk Action Bar */}
+                      {(allPending.length > 1 || allAccepted.length > 1 || allPreparing.length > 1 || allCooling.length > 1 || allReady.length > 1) && (
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', paddingTop: '0.4rem', borderTop: '1px dashed var(--border-color)', marginTop: '0.3rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center' }}>Bulk:</span>
+                          {allPending.length > 1 && <button className="btn btn-success btn-sm" style={{ height: '36px', fontSize: '0.75rem' }} onClick={() => allPending.forEach(i => handleItemStatusChange(i.id, 'accepted', null, 15))}>✓ Accept All ({allPending.length})</button>}
+                          {allAccepted.length > 1 && <button className="btn btn-secondary btn-sm" style={{ height: '36px', fontSize: '0.75rem', background: 'var(--warning)', color: '#fff' }} onClick={() => allAccepted.forEach(i => handleItemStatusChange(i.id, 'preparing'))}>🔥 Cook All ({allAccepted.length})</button>}
+                          {allPreparing.length > 1 && <>
+                            <button className="btn btn-secondary btn-sm" style={{ height: '36px', fontSize: '0.75rem', background: '#0284c7', color: '#fff' }} onClick={() => allPreparing.forEach(i => handleItemStatusChange(i.id, 'cooling'))}>❄️ Cool All ({allPreparing.length})</button>
+                            <button className="btn btn-success btn-sm" style={{ height: '36px', fontSize: '0.75rem' }} onClick={() => allPreparing.forEach(i => handleItemStatusChange(i.id, 'ready'))}>🔔 Ready All ({allPreparing.length})</button>
+                          </>}
+                          {allCooling.length > 1 && <button className="btn btn-success btn-sm" style={{ height: '36px', fontSize: '0.75rem' }} onClick={() => allCooling.forEach(i => handleItemStatusChange(i.id, 'ready'))}>🔔 Ready Cooled ({allCooling.length})</button>}
+                          {allReady.length > 1 && <button className="btn btn-primary btn-sm" style={{ height: '36px', fontSize: '0.75rem', background: '#7c3aed' }} onClick={() => allReady.forEach(i => handleItemStatusChange(i.id, 'served'))}>🚚 Deliver All ({allReady.length})</button>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* DESKTOP TABLE (>=768px) — EXACT ORIGINAL TABLE RENDERING */
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>

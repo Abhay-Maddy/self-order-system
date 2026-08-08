@@ -255,33 +255,74 @@ h1, h2, h3, h4, h5, h6 {
   50% { opacity: 0.4; }
 }
 
-/* Fluid Screen Responsiveness across all screen sizes */
+/* Fluid Screen Responsiveness & Mobile-First UX */
 @media (max-width: 768px) {
   .container {
-    padding: 0 0.75rem;
+    padding: 0 0.6rem;
   }
   .input-field {
     font-size: 0.9rem;
-    padding: 0.55rem 0.75rem;
+    padding: 0.6rem 0.8rem;
+    min-height: 40px;
   }
   .btn {
-    padding: 0.55rem 0.9rem;
+    padding: 0.6rem 0.9rem;
     font-size: 0.85rem;
+    min-height: 38px;
+    touch-action: manipulation;
   }
   .badge {
     font-size: 0.7rem;
     padding: 0.2rem 0.5rem;
   }
+  
+  /* Horizontal Touch Scrolling for Data Tables on Mobile */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Full width bottom-sheet modals on mobile screens */
+  .glass-card {
+    border-radius: 12px;
+  }
+
+  .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  
+  .modal-container {
+    max-width: 100% !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 20px !important;
+    border-top-right-radius: 20px !important;
+    max-height: 85vh !important;
+    padding: 1.25rem 1rem !important;
+    margin: 0 !important;
+  }
 }
 
 @media (max-width: 480px) {
   body {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
   .container {
-    padding: 0 0.5rem;
+    padding: 0 0.4rem;
   }
-  h1 { font-size: 1.5rem; }
-  h2 { font-size: 1.2rem; }
-  h3 { font-size: 1.05rem; }
+  h1 { font-size: 1.35rem; }
+  h2 { font-size: 1.15rem; }
+  h3 { font-size: 1rem; }
+  
+  .btn-lg {
+    padding: 0.7rem 1.25rem;
+    font-size: 0.95rem;
+  }
+  
+  /* Ensure floating action bars don't obscure content on small mobile screens */
+  main, .app-content {
+    padding-bottom: 90px;
+  }
 }

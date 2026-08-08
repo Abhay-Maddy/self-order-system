@@ -7,10 +7,12 @@ import { PageSkeleton } from '../Common/PageSkeleton';
 import { StaffLoginView } from '../Common/StaffLoginView';
 import { playWaiterVibrationAndChime } from '../../utils/sound';
 import { UserCheck, Bell, CheckCircle2, Clock, RefreshCw, Filter, Smartphone, Volume2 } from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const WaiterPanel = ({ setActivePanel }) => {
   const { user } = useContext(AuthContext);
   const { socket, joinRoom } = useContext(SocketContext);
+  const isMobile = useIsMobile(768);
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -115,7 +117,107 @@ export const WaiterPanel = ({ setActivePanel }) => {
       );
     }
 
-    return (
+    return isMobile ? (
+      /* MOBILE STACKED TICKET CARDS FOR WAITER PANEL (below 768px) */
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        {ordList.map(ord => {
+          const items = ord.items || [];
+          const elapsed = Math.floor((Date.now() - new Date(ord.created_at).getTime()) / 60000);
+
+          let badge = { label: 'ACTIVE', color: 'var(--text-muted)', bg: 'var(--bg-surface-elevated)' };
+          if (mode === 'delivered') badge = { label: '✅ DELIVERED', color: 'var(--success)', bg: 'var(--success-bg)' };
+          else if (mode === 'ready') badge = { label: '🔔 READY', color: '#ea580c', bg: 'rgba(249,115,22,0.12)' };
+          else badge = { label: '🔥 COOKING', color: 'var(--warning)', bg: 'var(--warning-bg)' };
+
+          return (
+            <div key={ord.id} className="glass-card" style={{ padding: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--brand-primary)' }}>#{ord.order_number}</span>
+                  <span className="badge badge-dinein" style={{ fontSize: '0.72rem', fontWeight: 800 }}>Table #{ord.table_number}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                    {formatTime(ord.created_at)} ({elapsed}m ago)
+                  </span>
+                  <span style={{ background: badge.bg, color: badge.color, borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, padding: '0.15rem 0.45rem' }}>
+                    {badge.label}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.4rem' }}>
+                {items.map(item => {
+                  const statusColors = {
+                    pending:   { color: 'var(--danger)',  bg: 'var(--danger-bg)' },
+                    accepted:  { color: '#d97706',        bg: '#fef3c7' },
+                    preparing: { color: 'var(--warning)', bg: 'var(--warning-bg)' },
+                    cooling:   { color: '#0284c7',        bg: '#e0f2fe' },
+                    ready:     { color: '#ea580c',        bg: 'rgba(249,115,22,0.12)' },
+                    served:    { color: 'var(--success)', bg: 'var(--success-bg)' },
+                    rejected:  { color: 'var(--danger)',  bg: 'var(--danger-bg)' },
+                  };
+                  const sc = statusColors[item.status] || statusColors.pending;
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem',
+                        padding: '0.45rem 0.65rem',
+                        background: 'var(--bg-surface-elevated)',
+                        border: `1px solid ${sc.color}28`,
+                        borderLeft: `3px solid ${sc.color}`,
+                        borderRadius: '7px',
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{item.quantity}× {item.item_name}</span>
+                        {item.variant_name && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '4px' }}>({item.variant_name})</span>}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ background: sc.bg, color: sc.color, borderRadius: '5px', fontSize: '0.68rem', fontWeight: 800, padding: '0.15rem 0.45rem' }}>
+                          {item.status.toUpperCase()}
+                        </span>
+
+                        {mode === 'ready' && item.status === 'ready' && (
+                          <button
+                            onClick={() => handleMarkServed(item.id)}
+                            className="btn btn-success btn-sm"
+                            style={{ height: '38px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 800 }}
+                          >
+                            <CheckCircle2 size={14} /> Deliver
+                          </button>
+                        )}
+                        {mode === 'ready' && item.status === 'served' && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: 800 }}>✅ Delivered</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Mobile Deliver All Button */}
+              {mode === 'ready' && (
+                <div style={{ marginTop: '0.65rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => handleMarkAllOrderServed(ord.id, items)}
+                    className="btn btn-success"
+                    style={{ width: '100%', height: '42px', fontSize: '0.85rem', fontWeight: 800, justifyContent: 'center' }}
+                  >
+                    <CheckCircle2 size={16} /> Deliver All Items for Table #{ord.table_number}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      /* DESKTOP TABLE (>=768px) — EXACT ORIGINAL TABLE RENDERING */
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
           <thead>
