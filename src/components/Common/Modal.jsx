@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px' }) => {
+export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px', headerActions = null }) => {
   if (!isOpen) return null;
 
   return (
@@ -28,9 +28,12 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px' }) 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
           <h3 style={{ fontSize: '1.25rem' }}>{title}</h3>
-          <button onClick={onClose} className="btn btn-secondary btn-sm" style={{ borderRadius: '50%', padding: '0.3rem' }}>
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {headerActions}
+            <button onClick={onClose} className="btn btn-secondary btn-sm" style={{ borderRadius: '50%', padding: '0.3rem' }}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
         {children}
       </div>

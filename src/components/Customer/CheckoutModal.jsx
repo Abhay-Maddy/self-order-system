@@ -11,6 +11,7 @@ export const CheckoutModal = ({
   onClose,
   cart = [],
   tableNumber,
+  orderFor = 'customer',
   appliedCoupon,
   activeOrder,
   onPlaceOrderSuccess
@@ -65,6 +66,11 @@ export const CheckoutModal = ({
   if (!isOpen) return null;
 
   const handleConfirmOrder = async () => {
+    if (orderFor === 'customer' && (!tableNumber || tableNumber === 'None' || !tableNumber.trim())) {
+      setErrorMessage('⚠ Table selection is COMPULSORY for Customer orders! Please choose a valid table number.');
+      return;
+    }
+
     if (!customerPhone || !customerPhone.trim() || customerPhone.trim().length < 10) {
       setErrorMessage('Mobile Phone Number is COMPULSORY (*)! Please enter a valid 10-digit mobile number before placing your order.');
       return;

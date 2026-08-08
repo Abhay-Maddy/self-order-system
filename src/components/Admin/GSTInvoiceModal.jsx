@@ -137,6 +137,17 @@ export const GSTInvoiceModal = ({ orderId, orders = [], isOpen, onClose }) => {
       onClose={onClose}
       title={order.isConsolidated ? `Consolidated Bill (${order.orderCount} Orders)` : `GST Tax Invoice - Order #${order.order_number}`}
       maxWidth="650px"
+      headerActions={
+        <button
+          onClick={handlePrint}
+          className="btn btn-primary btn-sm"
+          style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', gap: '0.35rem', fontWeight: 800, fontSize: '0.8rem' }}
+          title="Print GST Invoice (Shortcut: P or Ctrl+P)"
+        >
+          <Printer size={15} />
+          <span>Print Bill</span>
+        </button>
+      }
     >
       <div>
         <div id="gst-invoice-print" style={{
@@ -234,6 +245,27 @@ export const GSTInvoiceModal = ({ orderId, orders = [], isOpen, onClose }) => {
                   <span>Grand Total:</span>
                   <span>₹{Number(order.net_amount || 0).toFixed(2)}</span>
                 </div>
+
+                {/* Refund Breakdown Section on Printed Bill */}
+                {(Number(order.refunded_amount || 0) > 0 || order.refund_reason) && (
+                  <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px dashed #d97706', color: '#b45309', fontSize: '0.85rem' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', marginBottom: '3px' }}>↺ REFUND DETAILS</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Refund Amount:</span>
+                      <span><b>-₹{Number(order.refunded_amount || 0).toFixed(2)}</b></span>
+                    </div>
+                    {order.refund_reason && (
+                      <div style={{ marginTop: '2px' }}>Reason: <b>{order.refund_reason}</b></div>
+                    )}
+                    <div style={{ marginTop: '2px' }}>
+                      Refund Mode: <b>{(order.refund_mode || (Number(order.refund_cash_amount) > 0 && Number(order.refund_online_amount) > 0 ? 'SPLIT (CASH + ONLINE)' : Number(order.refund_cash_amount) > 0 ? 'CASH' : 'ONLINE / CARD')).toUpperCase()}</b>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, marginTop: '4px', borderTop: '1px solid #b45309', paddingTop: '4px' }}>
+                      <span>Final Net Total:</span>
+                      <span>₹{Math.max(0, Number(order.net_amount || 0) - Number(order.refunded_amount || 0)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -241,19 +273,6 @@ export const GSTInvoiceModal = ({ orderId, orders = [], isOpen, onClose }) => {
           <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#444' }}>
             Thank you for dining at Aamantran. Please visit us again ❤️
           </div>
-        </div>
-
-        {/* Top / Action Print Button */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-          <button
-            onClick={handlePrint}
-            className="btn btn-primary"
-            style={{ padding: '0.55rem 1rem', borderRadius: '8px', gap: '0.4rem', fontWeight: 800 }}
-            title="Print GST Invoice"
-          >
-            <Printer size={18} />
-            <span>{order.isConsolidated ? 'Print Consolidated Bill' : 'Print Invoice'}</span>
-          </button>
         </div>
       </div>
     </Modal>

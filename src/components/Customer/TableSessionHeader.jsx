@@ -6,6 +6,8 @@ import { QrCode, Search, ShoppingBag, Menu, History, Sparkles, X, Info, RefreshC
 export const TableSessionHeader = ({
   selectedTable,
   setSelectedTable,
+  orderFor = 'customer',
+  setOrderFor,
   tables = [],
   searchQuery,
   setSearchQuery,
@@ -37,6 +39,57 @@ export const TableSessionHeader = ({
 
   return (
     <div className="glass-card" style={{ padding: '0.85rem 1rem', marginBottom: '1.25rem', position: 'relative', zIndex: 50 }}>
+      {/* Order Purpose & Table Selector Bar for Staff/Admin & Customers */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem', paddingBottom: '0.65rem', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <span>ORDER FOR:</span>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '0.35rem' }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (setOrderFor) setOrderFor('self');
+            }}
+            className={`btn btn-sm ${orderFor === 'self' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', fontWeight: 800 }}
+          >
+            🙋‍♂️ Self / Staff
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (setOrderFor) setOrderFor('customer');
+              if (selectedTable === 'None' && setSelectedTable) setSelectedTable('T-01');
+            }}
+            className={`btn btn-sm ${orderFor === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', fontWeight: 800 }}
+          >
+            👥 Customer
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: orderFor === 'customer' ? 'var(--danger)' : 'var(--text-muted)' }}>
+            TABLE {orderFor === 'customer' && '*'}:
+          </span>
+          {hasTableParam ? (
+            <span className="badge badge-primary" style={{ fontWeight: 800, fontSize: '0.8rem' }}>Table #{selectedTable}</span>
+          ) : (
+            <select
+              value={selectedTable || (orderFor === 'self' ? 'None' : 'T-01')}
+              onChange={(e) => setSelectedTable && setSelectedTable(e.target.value)}
+              className="input-field"
+              style={{ width: '130px', padding: '0.3rem 0.4rem', fontSize: '0.8rem', fontWeight: 700, height: '32px' }}
+            >
+              {orderFor === 'self' && <option value="None">None (Takeaway)</option>}
+              {tableList.map((tb, idx) => (
+                <option key={idx} value={tb.table_number}>Table #{tb.table_number}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
       {/* Top Header Bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
 

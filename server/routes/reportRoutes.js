@@ -103,6 +103,7 @@ router.get('/analytics', verifyToken, requireRole(['admin', 'cashier']), async (
       totalOrders: totalOrdersRow ? totalOrdersRow.total : 0,
       activeOrders: activeOrdersRow ? activeOrdersRow.total : 0,
       avgPrepMinutes: 14,
+      avgPrepTime: '14 mins',
       topDish: topDishRow ? topDishRow.item_name : 'N/A',
       avgRating: reviewsAvg && reviewsAvg.avg_rating ? Number(reviewsAvg.avg_rating).toFixed(1) : '4.8',
       totalReviews: reviewsAvg ? reviewsAvg.review_count : 0,

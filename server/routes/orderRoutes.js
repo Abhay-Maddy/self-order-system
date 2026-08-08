@@ -110,15 +110,13 @@ router.post('/', async (req, res) => {
     const taxAmount = (netBeforeTax * taxRate) / 100;
     const finalTotal = netBeforeTax + taxAmount;
 
-    // 4. Check if there is an existing UNPAID active order for this table to append items onto
-    const existingUnpaidOrder = await getQuery(`
+    // 4. Check if there is an existing active session order for this table to append items onto
+    const existingActiveOrder = (table_number && table_number !== 'None') ? await getQuery(`
       SELECT * FROM orders 
       WHERE table_number = ? 
-      AND status != 'cancelled' 
-      AND status != 'refunded'
-      AND payment_status IN ('pending', 'pending_verification')
+      AND status NOT IN ('completed', 'delivered', 'cancelled', 'refunded')
       ORDER BY id DESC LIMIT 1
-    `, [table_number]);
+    `, [table_number]) : null;
 
     const { scheduled_time, order_source = 'customer', placed_by_name = '', placed_by_role = '' } = req.body;
     const defaultPrepMins = 15;
@@ -129,18 +127,44 @@ router.post('/', async (req, res) => {
     let orderNumber;
     let isAppended = false;
 
-    if (existingUnpaidOrder) {
-      // APPEND ITEMS TO EXISTING UNPAID ORDER (Same Order ID & Number, Cumulative Bill)
+    if (existingActiveOrder) {
+      // APPEND ITEMS TO EXISTING ACTIVE TABLE ORDER (Same Order Number, Combined Session Bill)
       isAppended = true;
-      orderId = existingUnpaidOrder.id;
-      orderNumber = existingUnpaidOrder.order_number;
+      orderId = existingActiveOrder.id;
+      orderNumber = existingActiveOrder.order_number;
 
-      const accumulatedTotalAmount = Number(existingUnpaidOrder.total_amount || 0) + subtotal;
-      const accumulatedDiscountAmount = Number(existingUnpaidOrder.discount_amount || 0) + discountAmount;
+      const accumulatedTotalAmount = Number(existingActiveOrder.total_amount || 0) + subtotal;
+      const accumulatedDiscountAmount = Number(existingActiveOrder.discount_amount || 0) + discountAmount;
       const accumulatedNetBeforeTax = Math.max(0, accumulatedTotalAmount - accumulatedDiscountAmount);
       const accumulatedTaxAmount = (accumulatedNetBeforeTax * taxRate) / 100;
       const accumulatedFinalTotal = accumulatedNetBeforeTax + accumulatedTaxAmount;
-      const updatedPhone = customer_phone || existingUnpaidOrder.customer_phone;
+      const updatedPhone = customer_phone || existingActiveOrder.customer_phone;
+
+      // Track online vs cash payment split
+      let existingOnlinePaid = Number(existingActiveOrder.online_paid || 0);
+      let existingCashPaid = Number(existingActiveOrder.cash_paid || 0);
+
+      if (existingActiveOrder.payment_status === 'completed' && existingOnlinePaid === 0 && existingCashPaid === 0) {
+        if (existingActiveOrder.payment_mode === 'online') {
+          existingOnlinePaid = Number(existingActiveOrder.net_amount || 0);
+        } else {
+          existingCashPaid = Number(existingActiveOrder.net_amount || 0);
+        }
+      }
+
+      if (payment_mode === 'online') {
+        existingOnlinePaid += finalTotal;
+      }
+
+      let newPaymentMode = existingActiveOrder.payment_mode;
+      if ((existingOnlinePaid > 0 && payment_mode === 'cash') || (existingCashPaid > 0 && payment_mode === 'online') || existingActiveOrder.payment_mode === 'cash_and_online') {
+        newPaymentMode = 'cash_and_online';
+      } else if (payment_mode) {
+        newPaymentMode = payment_mode;
+      }
+
+      const totalPaidSoFar = existingOnlinePaid + existingCashPaid;
+      const newPaymentStatus = totalPaidSoFar >= (accumulatedFinalTotal - 1) ? 'completed' : 'pending';
 
       await runQuery(`
         UPDATE orders SET
@@ -150,17 +174,34 @@ router.post('/', async (req, res) => {
         net_amount = ?,
         customer_phone = ?,
         status = 'active',
-        payment_mode = COALESCE(?, payment_mode)
+        payment_mode = ?,
+        payment_status = ?,
+        online_paid = ?,
+        cash_paid = ?
         WHERE id = ?
-      `, [accumulatedTotalAmount, accumulatedTaxAmount, accumulatedDiscountAmount, accumulatedFinalTotal, updatedPhone || null, payment_mode || null, orderId]);
+      `, [
+        accumulatedTotalAmount,
+        accumulatedTaxAmount,
+        accumulatedDiscountAmount,
+        accumulatedFinalTotal,
+        updatedPhone || null,
+        newPaymentMode,
+        newPaymentStatus,
+        existingOnlinePaid,
+        existingCashPaid,
+        orderId
+      ]);
     } else {
       // CREATE BRAND NEW ORDER
       orderNumber = generateOrderNumber();
+      const initialOnlinePaid = payment_mode === 'online' ? finalTotal : 0;
+      const initialCashPaid = (payment_mode === 'cash' && req.body.payment_status === 'completed') ? finalTotal : 0;
+
       const orderRes = await runQuery(`
         INSERT INTO orders
-        (order_number, table_number, customer_phone, payment_mode, payment_status, total_amount, tax_amount, discount_amount, net_amount, status, order_source, placed_by_name, placed_by_role, scheduled_time, prep_time_minutes, estimated_ready_at, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
-      `, [orderNumber, table_number, customer_phone || null, payment_mode || 'cash', payment_mode === 'online' ? 'completed' : 'pending', subtotal, taxAmount, discountAmount, finalTotal, order_source, placed_by_name || '', placed_by_role || '', scheduled_time || 'ASAP (~15 mins)', defaultPrepMins, initialEstimatedReadyAt, nowLocalStr]);
+        (order_number, table_number, customer_phone, payment_mode, payment_status, total_amount, tax_amount, discount_amount, net_amount, online_paid, cash_paid, status, order_source, placed_by_name, placed_by_role, scheduled_time, prep_time_minutes, estimated_ready_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+      `, [orderNumber, table_number, customer_phone || null, payment_mode || 'cash', payment_mode === 'online' ? 'completed' : (req.body.payment_status || 'pending'), subtotal, taxAmount, discountAmount, finalTotal, initialOnlinePaid, initialCashPaid, order_source, placed_by_name || '', placed_by_role || '', scheduled_time || 'ASAP (~15 mins)', defaultPrepMins, initialEstimatedReadyAt, nowLocalStr]);
 
       orderId = orderRes.lastID;
     }
@@ -641,12 +682,13 @@ router.patch('/:id/refund', verifyToken, requireRole(['admin', 'cashier']), asyn
     if (actualRefund < 0) actualRefund = 0;
     if (actualRefund > totalAmt) actualRefund = totalAmt;
 
-    const isFull = actualRefund >= totalAmt;
-    const newStatus = isFull ? 'refunded' : 'partially_refunded';
+    const isFull = actualRefund >= (totalAmt - 0.01);
+    const newPaymentStatus = 'refunded';
+    const newOrderStatus = isFull ? 'refunded' : (order.status || 'active');
 
     await runQuery(
       `UPDATE orders SET payment_status = ?, status = ?, refund_reason = ?, refunded_amount = ?, refund_cash_amount = ?, refund_online_amount = ?, refund_mode = ? WHERE id = ?`,
-      [newStatus, newStatus, refund_reason || 'Customer Requested Refund', actualRefund, rCash, rOnline, refund_mode, req.params.id]
+      [newPaymentStatus, newOrderStatus, refund_reason || 'Customer Requested Refund', actualRefund, rCash, rOnline, refund_mode, req.params.id]
     );
 
     const updatedOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);

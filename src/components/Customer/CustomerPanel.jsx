@@ -40,6 +40,7 @@ export const CustomerPanel = ({ setActivePanel }) => {
   const [allItems, setAllItems] = useState([]);
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState('T-01');
+  const [orderFor, setOrderFor] = useState('customer'); // 'self' or 'customer'
 
   // Check if table parameter is present in URL
   const hasTableParam = Boolean(new URLSearchParams(window.location.search).get('table'));
@@ -339,6 +340,8 @@ export const CustomerPanel = ({ setActivePanel }) => {
         <TableSessionHeader
           selectedTable={selectedTable}
           setSelectedTable={setSelectedTable}
+          orderFor={orderFor}
+          setOrderFor={setOrderFor}
           tables={tables}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
@@ -497,6 +500,7 @@ export const CustomerPanel = ({ setActivePanel }) => {
           onClose={() => setIsCheckoutOpen(false)}
           cart={cart}
           tableNumber={selectedTable}
+          orderFor={orderFor}
           appliedCoupon={appliedCoupon}
           activeOrder={activeOrder}
           onPlaceOrderSuccess={handlePlaceOrderSuccess}

@@ -13,6 +13,8 @@ export const KitchenHeader = ({
   setSortOrder,
   selectedDate,
   setSelectedDate,
+  searchQuery = '',
+  setSearchQuery,
   tables,
   lowStockItems
 }) => {
@@ -79,8 +81,20 @@ export const KitchenHeader = ({
           </div>
         </div>
 
-        {/* Filter, Date & Sorting Control Bar */}
+        {/* Filter, Search, Date & Sorting Control Bar */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+          {/* Search Box */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-surface-elevated)', padding: '0.25rem 0.55rem', borderRadius: '6px', border: '1px solid var(--border-color)', minWidth: '180px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Search dishes, table, order #..."
+              value={searchQuery}
+              onChange={e => setSearchQuery && setSearchQuery(e.target.value)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: '0.8rem', width: '100%', outline: 'none' }}
+            />
+          </div>
+
           {/* Date Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600 }}>
             <Calendar size={16} className="text-brand" />

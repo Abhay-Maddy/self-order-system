@@ -20,7 +20,11 @@ export const KitchenPanel = ({ setActivePanel }) => {
   const [lowStockItems, setLowStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rejectingItem, setRejectingItem] = useState(null);
-  const [printingOrder, setPrintingOrder] = useState(null);
+  const [printingOrders, setPrintingOrders] = useState([]);
+
+  // Checkbox selection & search state
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [tableFilter, setTableFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('oldest');
@@ -54,7 +58,7 @@ export const KitchenPanel = ({ setActivePanel }) => {
     joinRoom('kitchen');
 
     const onNew = (newOrder) => {
-      try { playKitchenChime(newOrder?.table_number); } catch (e) {}
+      try { playKitchenChime(newOrder?.table_number); } catch (e) { }
       loadActiveOrders();
     };
     const onUpdate = () => loadActiveOrders();
@@ -71,6 +75,30 @@ export const KitchenPanel = ({ setActivePanel }) => {
       socket.off('table_order_updated', onUpdate);
     };
   }, [socket, user, joinRoom, loadActiveOrders]);
+
+  // Keyboard 'P' / 'p' or Ctrl+P listener to print selected KOT(s)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target ? e.target.tagName.toLowerCase() : '';
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      const isP = e.key === 'p' || e.key === 'P';
+      const isCtrlP = (e.ctrlKey || e.metaKey) && isP;
+
+      if (isP || isCtrlP) {
+        e.preventDefault();
+        if (selectedOrderIds.length > 0) {
+          const selectedList = orders.filter(o => selectedOrderIds.includes(o.id));
+          if (selectedList.length > 0) {
+            setPrintingOrders(selectedList);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedOrderIds, orders]);
 
   const handleItemStatusChange = async (itemId, newStatus, rejectionReason = null, prepMins = null) => {
     try {
@@ -89,6 +117,19 @@ export const KitchenPanel = ({ setActivePanel }) => {
   }
 
   let processedOrders = [...orders];
+
+  // Search query filter
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase().trim();
+    processedOrders = processedOrders.filter(ord => {
+      const orderNum = (ord.order_number || '').toLowerCase();
+      const tableNum = String(ord.table_number || '').toLowerCase();
+      const sourceStr = (ord.placed_by_name || ord.order_source || '').toLowerCase();
+      const itemsStr = (ord.items || []).map(i => i.item_name).join(' ').toLowerCase();
+      return orderNum.includes(q) || tableNum.includes(q) || sourceStr.includes(q) || itemsStr.includes(q);
+    });
+  }
+
   if (tableFilter !== 'all') {
     processedOrders = processedOrders.filter(o => o.table_number === tableFilter);
   }
@@ -98,9 +139,9 @@ export const KitchenPanel = ({ setActivePanel }) => {
     processedOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
-  const pendingOrders   = processedOrders.filter(o => o.items && o.items.some(i => i.status === 'pending'));
+  const pendingOrders = processedOrders.filter(o => o.items && o.items.some(i => i.status === 'pending'));
   const preparingOrders = processedOrders.filter(o => o.items && o.items.some(i => ['preparing', 'accepted', 'cooling'].includes(i.status)));
-  const readyOrders     = processedOrders.filter(o => o.items && o.items.some(i => ['ready', 'served'].includes(i.status)));
+  const readyOrders = processedOrders.filter(o => o.items && o.items.some(i => ['ready', 'served'].includes(i.status)));
 
   // Reusable button style factory
   const btn = (bg, color = '#fff') => ({
@@ -111,13 +152,21 @@ export const KitchenPanel = ({ setActivePanel }) => {
   });
 
   const STATUS_COLORS = {
-    pending:   { color: 'var(--danger)',  bg: 'var(--danger-bg)' },
-    accepted:  { color: '#d97706',        bg: '#fef3c7' },
+    pending: { color: 'var(--danger)', bg: 'var(--danger-bg)' },
+    accepted: { color: '#d97706', bg: '#fef3c7' },
     preparing: { color: 'var(--warning)', bg: 'var(--warning-bg)' },
-    cooling:   { color: '#0284c7',        bg: '#e0f2fe' },
-    ready:     { color: '#ea580c',        bg: 'rgba(249,115,22,0.12)' },
-    served:    { color: 'var(--success)', bg: 'var(--success-bg)' },
-    rejected:  { color: 'var(--danger)',  bg: 'var(--danger-bg)' },
+    cooling: { color: '#0284c7', bg: '#e0f2fe' },
+    ready: { color: '#ea580c', bg: 'rgba(249,115,22,0.12)' },
+    served: { color: 'var(--success)', bg: 'var(--success-bg)' },
+    rejected: { color: 'var(--danger)', bg: 'var(--danger-bg)' },
+  };
+
+  const handlePrintSelectedKOT = () => {
+    if (selectedOrderIds.length === 0) return;
+    const selectedList = orders.filter(o => selectedOrderIds.includes(o.id));
+    if (selectedList.length > 0) {
+      setPrintingOrders(selectedList);
+    }
   };
 
   return (
@@ -132,6 +181,8 @@ export const KitchenPanel = ({ setActivePanel }) => {
         setSortOrder={setSortOrder}
         selectedDate={selectedDate}
         setSelectedDate={setSelectedDate}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
         tables={tables}
         lowStockItems={lowStockItems}
       />
@@ -147,17 +198,77 @@ export const KitchenPanel = ({ setActivePanel }) => {
             <span style={{ background: 'var(--success-bg)', color: 'var(--success)', borderRadius: '8px', padding: '0.2rem 0.7rem', fontSize: '0.82rem', fontWeight: 700 }}>🔔 Ready: {readyOrders.length}</span>
           </div>
 
+          {/* SELECTION KOT PRINT ACTION BAR — Enables ONLY after item/order selection */}
+          {selectedOrderIds.length > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justify: 'space-between',
+              background: 'rgba(234, 88, 12, 0.12)',
+              border: '1.5px solid var(--brand-primary)',
+              borderRadius: '8px',
+              padding: '0.6rem 1rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', fontWeight: 700, color: 'var(--brand-primary)' }}>
+                <span>✓ {selectedOrderIds.length} Order{selectedOrderIds.length > 1 ? 's' : ''} Selected</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={handlePrintSelectedKOT}
+                  className="btn btn-primary btn-sm"
+                  style={{ fontWeight: 800, gap: '0.4rem', padding: '0.4rem 0.85rem', background: 'var(--brand-primary)', color: '#fff', fontSize: '0.82rem' }}
+                  title="Print KOT Ticket for Selected Order(s) (Shortcut: P or Ctrl+P)"
+                >
+                  <Printer size={15} />
+                  <span>
+                    {selectedOrderIds.length > 1
+                      ? `Print Consolidated KOT (${selectedOrderIds.length} Orders) (Shortcut: P)`
+                      : `Print Selected KOT (1 Order) (Shortcut: P)`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderIds([])}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.78rem', padding: '0.4rem 0.65rem' }}
+                  title="Deselect All Selected Orders"
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+          )}
+
           {processedOrders.length === 0 ? (
             <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               <ChefHat size={40} style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
               <h3>No Active Kitchen Orders</h3>
-              <p style={{ fontSize: '0.85rem' }}>New orders will appear here in real-time</p>
+              <p style={{ fontSize: '0.85rem' }}>
+                {searchQuery ? `No kitchen orders found matching "${searchQuery}"` : 'New orders will appear here in real-time'}
+              </p>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '0.5rem 0.4rem', width: '28px' }}>
+                      <input
+                        type="checkbox"
+                        checked={processedOrders.length > 0 && selectedOrderIds.length === processedOrders.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedOrderIds(processedOrders.map(o => o.id));
+                          } else {
+                            setSelectedOrderIds([]);
+                          }
+                        }}
+                        style={{ cursor: 'pointer', transform: 'scale(1.1)' }}
+                        title="Select All Orders"
+                      />
+                    </th>
                     <th style={{ padding: '0.5rem 0.6rem', width: '140px' }}>Order # &amp; Table</th>
                     <th style={{ padding: '0.5rem 0.6rem', width: '75px' }}>Time</th>
                     <th style={{ padding: '0.5rem 0.6rem', width: '100px' }}>Source</th>
@@ -171,12 +282,13 @@ export const KitchenPanel = ({ setActivePanel }) => {
                     const items = ord.items || [];
                     const elapsed = Math.floor((Date.now() - new Date(ord.created_at).getTime()) / 60000);
                     const isOverdue = elapsed > 15;
+                    const isSelected = selectedOrderIds.includes(ord.id);
 
-                    const allPending   = items.filter(i => i.status === 'pending');
-                    const allAccepted  = items.filter(i => i.status === 'accepted');
+                    const allPending = items.filter(i => i.status === 'pending');
+                    const allAccepted = items.filter(i => i.status === 'accepted');
                     const allPreparing = items.filter(i => i.status === 'preparing');
-                    const allCooling   = items.filter(i => i.status === 'cooling');
-                    const allReady     = items.filter(i => i.status === 'ready');
+                    const allCooling = items.filter(i => i.status === 'cooling');
+                    const allReady = items.filter(i => i.status === 'ready');
 
                     let badge = { label: 'ACTIVE', color: 'var(--text-muted)', bg: 'var(--bg-surface-elevated)' };
                     if (items.every(i => ['served', 'rejected'].includes(i.status))) {
@@ -192,7 +304,27 @@ export const KitchenPanel = ({ setActivePanel }) => {
                     }
 
                     return (
-                      <tr key={ord.id} style={{ borderBottom: '1px solid var(--border-color)', background: isOverdue ? 'rgba(239,68,68,0.04)' : 'transparent' }}>
+                      <tr
+                        key={ord.id}
+                        style={{
+                          borderBottom: '1px solid var(--border-color)',
+                          background: isSelected ? 'rgba(234, 88, 12, 0.12)' : (isOverdue ? 'rgba(239,68,68,0.04)' : 'transparent'),
+                          transition: 'background 0.15s'
+                        }}
+                      >
+                        {/* Checkbox */}
+                        <td style={{ padding: '0.55rem 0.4rem', width: '28px', verticalAlign: 'top' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              setSelectedOrderIds(prev =>
+                                prev.includes(ord.id) ? prev.filter(id => id !== ord.id) : [...prev, ord.id]
+                              );
+                            }}
+                            style={{ cursor: 'pointer', transform: 'scale(1.1)' }}
+                          />
+                        </td>
 
                         {/* Order # & Table */}
                         <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top' }}>
@@ -212,11 +344,11 @@ export const KitchenPanel = ({ setActivePanel }) => {
                         {/* Source */}
                         <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top' }}>
                           {(ord.order_source === 'staff' || ord.placed_by_name) ? (
-                            <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #f59e0b', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px' }}>
+                            <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #f59e0b', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, padding: '5px 6px' }}>
                               🟡 {ord.placed_by_name || 'Staff'}
                             </span>
                           ) : (
-                            <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #22c55e', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px' }}>
+                            <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #22c55e', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, padding: '5px 6px' }}>
                               🟢 Customer
                             </span>
                           )}
@@ -253,7 +385,7 @@ export const KitchenPanel = ({ setActivePanel }) => {
                                     {item.status.toUpperCase()}
                                   </span>
 
-                                  {/* Action buttons — inline, no separate box */}
+                                  {/* Action buttons */}
                                   {item.status === 'pending' && (
                                     <>
                                       <select id={`pm-${item.id}`} defaultValue="15"
@@ -293,7 +425,7 @@ export const KitchenPanel = ({ setActivePanel }) => {
                               );
                             })}
 
-                            {/* Bulk action bar (only when >1 items in same state) */}
+                            {/* Bulk action bar */}
                             {(allPending.length > 1 || allAccepted.length > 1 || allPreparing.length > 1 || allCooling.length > 1 || allReady.length > 1) && (
                               <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', paddingTop: '0.3rem', borderTop: '1px dashed var(--border-color)' }}>
                                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center' }}>Bulk:</span>
@@ -320,8 +452,8 @@ export const KitchenPanel = ({ setActivePanel }) => {
                         {/* KOT Print */}
                         <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top', textAlign: 'center' }}>
                           <button
-                            onClick={() => setPrintingOrder(ord)}
-                            title="Print KOT"
+                            onClick={() => setPrintingOrders([ord])}
+                            title="Print KOT Ticket (Shortcut: P or Ctrl+P)"
                             style={{ background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.28rem 0.5rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.72rem', fontWeight: 700 }}
                           >
                             <Printer size={13} /> KOT
@@ -345,9 +477,9 @@ export const KitchenPanel = ({ setActivePanel }) => {
       />
 
       <KOTPrintView
-        order={printingOrder}
-        isOpen={Boolean(printingOrder)}
-        onClose={() => setPrintingOrder(null)}
+        orders={printingOrders}
+        isOpen={printingOrders.length > 0}
+        onClose={() => setPrintingOrders([])}
       />
     </div>
   );

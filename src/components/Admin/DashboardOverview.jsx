@@ -287,7 +287,7 @@ export const DashboardOverview = ({ setActivePanel }) => {
   const revenueLabel = isToday ? 'Today Revenue' : `Revenue (${selectedDate})`;
   const ordersLabel = isToday ? 'Today total Orders' : `Total Orders (${selectedDate})`;
 
-  // Filter orders by search query
+  // Filter and sort orders: NEW / Active / Pending / Unpaid orders ALWAYS go to the VERY TOP!
   const filteredOrders = orders.filter(ord => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
@@ -297,6 +297,14 @@ export const DashboardOverview = ({ setActivePanel }) => {
     const itemsStr = (ord.items || []).map(i => i.item_name).join(' ').toLowerCase();
     const modeStr = (ord.payment_mode || '').toLowerCase();
     return orderNum.includes(q) || tableNum.includes(q) || phone.includes(q) || itemsStr.includes(q) || modeStr.includes(q);
+  }).sort((a, b) => {
+    const aIsActive = ['active', 'pending', 'pending_verification'].includes(a.status) || a.payment_status === 'pending' || a.payment_status === 'unpaid';
+    const bIsActive = ['active', 'pending', 'pending_verification'].includes(b.status) || b.payment_status === 'pending' || b.payment_status === 'unpaid';
+
+    if (aIsActive && !bIsActive) return -1;
+    if (!aIsActive && bIsActive) return 1;
+
+    return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
   });
 
   return (
@@ -331,7 +339,9 @@ export const DashboardOverview = ({ setActivePanel }) => {
               <Clock size={18} />
             </div>
           </div>
-          <h2 style={{ fontSize: '1.6rem', color: 'var(--brand-primary)', margin: 0 }}>{stats.avgPrepTime}</h2>
+          <h2 style={{ fontSize: '1.6rem', color: 'var(--brand-primary)', margin: 0 }}>
+            {stats.avgPrepTime || (stats.avgPrepMinutes ? `${stats.avgPrepMinutes} mins` : '14 mins')}
+          </h2>
         </div>
 
         <div className="glass-card" style={{ padding: '1rem 1.15rem' }}>
@@ -358,31 +368,33 @@ export const DashboardOverview = ({ setActivePanel }) => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
 
-            {/*Print Consolidated Bill*/}
-            <button
-              type="button"
-              onClick={handlePrintSelected}
-              className="btn btn-primary btn-sm"
-              style={{ fontWeight: 800, gap: '0.4rem', padding: '0.4rem 0.85rem', background: 'var(--brand-primary)', color: '#fff', fontSize: '0.82rem' }}
-              title="Print Selected Bill Invoice(s) (Shortcut: P or Ctrl+P)"
-            >
-              <Printer size={15} />
-              <span>
-                {selectedOrderIds.length > 1
-                  ? `Print Bill (${selectedOrderIds.length})`
-                  : `Print Bill`}
-              </span>
-            </button>
-
-            {/*Deselect*/}
-            <button
-              type="button"
-              onClick={() => setSelectedOrderIds([])}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.78rem', padding: '0.4rem 0.65rem' }}
-            >
-              Deselect All
-            </button>
+            {/* Print & Deselect Header Controls — VISIBLE ONLY WHEN SELECTED */}
+            {selectedOrderIds.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePrintSelected}
+                  className="btn btn-primary btn-sm"
+                  style={{ fontWeight: 800, gap: '0.4rem', padding: '0.4rem 0.85rem', background: 'var(--brand-primary)', color: '#fff', fontSize: '0.82rem' }}
+                  title="Print Selected Bill Invoice(s) (Shortcut: P or Ctrl+P)"
+                >
+                  <Printer size={15} />
+                  <span>
+                    {selectedOrderIds.length > 1
+                      ? `Print Bill (${selectedOrderIds.length})`
+                      : `Print Bill`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderIds([])}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.78rem', padding: '0.4rem 0.65rem' }}
+                >
+                  Deselect All
+                </button>
+              </>
+            )}
 
             {/* Search Input Box */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-surface-elevated)', padding: '0.25rem 0.55rem', borderRadius: '6px', border: '1px solid var(--border-color)', width: '180px' }}>
@@ -478,9 +490,13 @@ export const DashboardOverview = ({ setActivePanel }) => {
               {filteredOrders.map(ord => {
                 const isRefunded = ord.status === 'refunded' || ord.payment_status === 'refunded' || (Number(ord.refunded_amount) || 0) > 0;
                 const isPaid = ord.payment_status === 'completed' && !isRefunded;
-                const isSplit = ord.payment_mode === 'cash_and_online';
                 const items = ord.items || [];
                 const isSelected = selectedOrderIds.includes(ord.id);
+
+                const onlinePaid = Number(ord.online_paid) || (ord.payment_mode === 'online' && ord.payment_status === 'completed' ? Number(ord.net_amount) : 0);
+                const cashPaid = Number(ord.cash_paid) || (ord.payment_mode === 'cash' && ord.payment_status === 'completed' ? Number(ord.net_amount) : 0);
+                const remDue = Math.max(0, (Number(ord.net_amount) || 0) - (onlinePaid + cashPaid));
+                const isMixedPay = ord.payment_mode === 'cash_and_online' || (onlinePaid > 0 && remDue > 0);
 
                 // Order Lifecycle Status
                 const isAllServedOrRejected = items.length > 0 && items.every(i => ['served', 'rejected'].includes(i.status));
@@ -611,15 +627,15 @@ export const DashboardOverview = ({ setActivePanel }) => {
                     {/* Payment Mode (ONLY Mode written) */}
                     <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '85px' }}>
                       <span className="badge" style={{
-                        background: isSplit ? 'rgba(234, 88, 12, 0.15)' : 'var(--bg-surface-elevated)',
-                        color: isSplit ? '#ea580c' : 'var(--text-main)',
+                        background: isMixedPay ? 'rgba(234, 88, 12, 0.15)' : 'var(--bg-surface-elevated)',
+                        color: isMixedPay ? '#ea580c' : 'var(--text-main)',
                         border: '1px solid var(--border-color)',
                         fontSize: '0.74rem',
                         fontWeight: 800,
                         padding: '0.25rem 0.45rem',
                         textTransform: 'uppercase'
                       }}>
-                        {isSplit ? 'CASH + ONLINE' : (ord.payment_mode || 'CASH')}
+                        {isMixedPay ? 'ONLINE & CASH' : (ord.payment_mode || 'CASH')}
                       </span>
                     </td>
 
@@ -636,7 +652,7 @@ export const DashboardOverview = ({ setActivePanel }) => {
                           <span className="badge badge-veg" style={{ fontSize: '0.75rem', fontWeight: 800, padding: '0.25rem 0.55rem', display: 'inline-block' }}>
                             ✓ PAID
                           </span>
-                          {isSplit && (
+                          {isMixedPay && (
                             <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 700 }}>
                               Cash: {formatCurrency(ord.cash_paid || 0)} | Online: {formatCurrency(ord.online_paid || 0)}
                             </div>
@@ -649,9 +665,29 @@ export const DashboardOverview = ({ setActivePanel }) => {
                               UNPAID
                             </span>
                           </div>
-
-                          {/* Pay Options Trigger Button with Dropdown Arrow */}
-                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                          {/* Pay Now Button (Direct Pay in Cash) + Arrow Trigger (Opens Options) */}
+                          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActivePayDropdownId(null);
+                                handleUpdatePayment(ord.id, 'cash', 'completed', ord.net_amount, 0);
+                              }}
+                              className="btn btn-primary btn-sm"
+                              style={{
+                                padding: '0.25rem 0.45rem',
+                                fontSize: '0.72rem',
+                                background: 'var(--success)',
+                                fontWeight: 800,
+                                borderTopRightRadius: 0,
+                                borderBottomRightRadius: 0,
+                                borderRight: '1px solid rgba(255,255,255,0.3)'
+                              }}
+                              title="Click to Pay Full Remaining Amount in Cash"
+                            >
+                              Pay Now ({formatCurrency(remDue > 0 ? remDue : ord.net_amount)})
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -661,16 +697,14 @@ export const DashboardOverview = ({ setActivePanel }) => {
                               }}
                               className="btn btn-primary btn-sm"
                               style={{
-                                padding: '0.25rem 0.5rem',
+                                padding: '0.25rem 0.35rem',
                                 fontSize: '0.72rem',
                                 background: 'var(--success)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                fontWeight: 800
+                                borderTopLeftRadius: 0,
+                                borderBottomLeftRadius: 0
                               }}
+                              title="More Payment Options (Card, Online, Split)"
                             >
-                              <span>Pay Cash</span>
                               <ChevronDown size={12} />
                             </button>
 
@@ -688,7 +722,7 @@ export const DashboardOverview = ({ setActivePanel }) => {
                                   borderRadius: '8px',
                                   boxShadow: 'var(--shadow-md)',
                                   zIndex: 100,
-                                  minWidth: '150px',
+                                  minWidth: '160px',
                                   padding: '0.35rem',
                                   display: 'flex',
                                   flexDirection: 'column',
@@ -697,19 +731,36 @@ export const DashboardOverview = ({ setActivePanel }) => {
                               >
                                 <button
                                   type="button"
-                                  onClick={() => handleUpdatePayment(ord.id, 'cash', 'completed', ord.net_amount, 0)}
+                                  onClick={() => {
+                                    setActivePayDropdownId(null);
+                                    handleUpdatePayment(ord.id, 'cash', 'completed', ord.net_amount, 0);
+                                  }}
                                   className="btn btn-secondary btn-sm"
                                   style={{ justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.3rem 0.5rem', color: 'var(--success)' }}
                                 >
-                                  💵 Pay 100% Cash
+                                  💵 Cash Payment
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleUpdatePayment(ord.id, 'online', 'completed', 0, ord.net_amount)}
+                                  onClick={() => {
+                                    setActivePayDropdownId(null);
+                                    handleUpdatePayment(ord.id, 'card', 'completed', 0, ord.net_amount);
+                                  }}
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.3rem 0.5rem', color: '#0284c7', fontWeight: 700 }}
+                                >
+                                  💳 Card Payment
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActivePayDropdownId(null);
+                                    handleUpdatePayment(ord.id, 'online', 'completed', 0, ord.net_amount);
+                                  }}
                                   className="btn btn-secondary btn-sm"
                                   style={{ justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.3rem 0.5rem', color: 'var(--brand-primary)' }}
                                 >
-                                  💳 Pay 100% Online
+                                  📱 Online / UPI Payment
                                 </button>
                                 <button
                                   type="button"
@@ -722,7 +773,7 @@ export const DashboardOverview = ({ setActivePanel }) => {
                                   className="btn btn-secondary btn-sm"
                                   style={{ justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.3rem 0.5rem', color: '#ea580c', fontWeight: 700 }}
                                 >
-                                  ⚡ Split Pay (Cash + Online)
+                                  ⚡ Split Pay (Cash + Online / Card)
                                 </button>
                               </div>
                             )}
@@ -738,7 +789,7 @@ export const DashboardOverview = ({ setActivePanel }) => {
                       </span>
                     </td>
 
-                    {/* Actions (Bill & Refund Amount Breakdown) */}
+                    {/* Actions (Bill & Direct Issue Refund) */}
                     <td style={{ padding: '0.45rem 0.4rem', textAlign: 'right', whiteSpace: 'nowrap', width: '130px', position: 'relative' }}>
                       <button
                         onClick={(e) => {
@@ -753,112 +804,43 @@ export const DashboardOverview = ({ setActivePanel }) => {
                       </button>
 
                       {isRefunded ? (
-                        <div style={{ display: 'inline-block', fontSize: '0.72rem', fontWeight: 800, textAlign: 'right' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '0.7rem', fontWeight: 800, textAlign: 'right', marginTop: '2px' }}>
                           {(ord.refund_cash_amount > 0 && ord.refund_online_amount > 0) ? (
-                            <span style={{ color: '#ea580c' }}>
-                              Cash: {formatCurrency(ord.refund_cash_amount)} | Online: {formatCurrency(ord.refund_online_amount)}
-                            </span>
-                          ) : (ord.refund_online_amount > 0 || ord.refund_mode === 'online') ? (
-                            <span style={{ color: 'var(--brand-primary)' }}>
-                              Online: {formatCurrency(ord.refund_online_amount || ord.refunded_amount || ord.net_amount)}
-                            </span>
+                            <>
+                              <div style={{ color: 'var(--success)' }}>Cash: {formatCurrency(ord.refund_cash_amount)}</div>
+                              <div style={{ color: 'var(--brand-primary)' }}>Online: {formatCurrency(ord.refund_online_amount)}</div>
+                            </>
+                          ) : (ord.refund_online_amount > 0 || ord.refund_mode === 'online' || ord.refund_mode === 'card') ? (
+                            <div style={{ color: 'var(--brand-primary)' }}>
+                              Online/Card: {formatCurrency(ord.refund_online_amount || ord.refunded_amount || ord.net_amount)}
+                            </div>
                           ) : (
-                            <span style={{ color: 'var(--success)' }}>
+                            <div style={{ color: 'var(--success)' }}>
                               Cash: {formatCurrency(ord.refund_cash_amount || ord.refunded_amount || ord.net_amount)}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div style={{ position: 'relative', display: 'inline-block' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActivePayDropdownId(null);
-                              setActiveRefundDropdownId(prev => prev === ord.id ? null : ord.id);
-                            }}
-                            className="btn btn-danger btn-sm"
-                            style={{ padding: '0.25rem 0.45rem', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                            title="Issue Refund Options"
-                          >
-                            <RotateCcw size={12} />
-                            <span>Refund</span>
-                            <ChevronDown size={11} />
-                          </button>
-
-                          {/* Refund Options Popover Menu */}
-                          {activeRefundDropdownId === ord.id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                position: 'absolute',
-                                top: '100%',
-                                right: 0,
-                                marginTop: '4px',
-                                background: 'var(--bg-surface-elevated)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                boxShadow: 'var(--shadow-md)',
-                                zIndex: 100,
-                                minWidth: '165px',
-                                padding: '0.35rem',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.25rem',
-                                textAlign: 'left'
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveRefundDropdownId(null);
-                                  setRefundingOrder(ord);
-                                  setRefundMode('cash');
-                                  setRefundAmount(ord.net_amount || ord.total_amount || '');
-                                  setRefundCashAmount(ord.net_amount || ord.total_amount || '');
-                                  setRefundOnlineAmount('');
-                                  setRefundReason('Customer Requested Refund');
-                                }}
-                                className="btn btn-secondary btn-sm"
-                                style={{ justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.3rem 0.5rem', color: 'var(--danger)' }}
-                              >
-                                💵 Cash Refund
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveRefundDropdownId(null);
-                                  setRefundingOrder(ord);
-                                  setRefundMode('online');
-                                  setRefundAmount(ord.net_amount || ord.total_amount || '');
-                                  setRefundCashAmount('');
-                                  setRefundOnlineAmount(ord.net_amount || ord.total_amount || '');
-                                  setRefundReason('Customer Requested Refund');
-                                }}
-                                className="btn btn-secondary btn-sm"
-                                style={{ justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.3rem 0.5rem', color: 'var(--brand-primary)' }}
-                              >
-                                💳 Online Refund
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveRefundDropdownId(null);
-                                  setRefundingOrder(ord);
-                                  setRefundMode('split');
-                                  setRefundCashAmount('');
-                                  setRefundOnlineAmount('');
-                                  setRefundAmount('');
-                                  setRefundReason('Customer Requested Refund');
-                                }}
-                                className="btn btn-secondary btn-sm"
-                                style={{ justifyContent: 'flex-start', fontSize: '0.73rem', padding: '0.3rem 0.5rem', color: '#ea580c', fontWeight: 700 }}
-                              >
-                                ⚡ Split Refund (Both)
-                              </button>
                             </div>
                           )}
                         </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePayDropdownId(null);
+                            setActiveRefundDropdownId(null);
+                            setRefundingOrder(ord);
+                            setRefundMode('cash');
+                            setRefundAmount(ord.net_amount || ord.total_amount || '');
+                            setRefundCashAmount('');
+                            setRefundOnlineAmount('');
+                            setRefundReason('Customer Requested Refund');
+                          }}
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: '0.25rem 0.45rem', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                          title="Click to Issue Refund"
+                        >
+                          <RotateCcw size={12} />
+                          <span>Refund</span>
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -947,137 +929,187 @@ export const DashboardOverview = ({ setActivePanel }) => {
         </Modal>
       )}
 
-      {/* ENHANCED REFUND SYSTEM MODAL (CASH / ONLINE / SPLIT) */}
-      {refundingOrder && (
-        <Modal isOpen={Boolean(refundingOrder)} onClose={() => setRefundingOrder(null)} title={`Issue Refund for Order #${refundingOrder.order_number}`}>
-          <form onSubmit={handleProcessRefundSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ background: 'var(--bg-surface-elevated)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 800, color: 'var(--brand-primary)', marginBottom: '0.2rem' }}>
-                Table #{refundingOrder.table_number} • Order #{refundingOrder.order_number}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Total Order Bill: <b>{formatCurrency(refundingOrder.net_amount || refundingOrder.total_amount)}</b>
-              </div>
-            </div>
+      {/* ENHANCED REFUND SYSTEM MODAL (CASH / ONLINE / CARD / SPLIT) */}
+      {refundingOrder && (() => {
+        const maxRefundable = Number(refundingOrder.net_amount || refundingOrder.total_amount) || 0;
+        const totalRequestedRefund = refundMode === 'split'
+          ? ((Number(refundCashAmount) || 0) + (Number(refundOnlineAmount) || 0))
+          : (Number(refundAmount) || 0);
+        const isOverRefund = totalRequestedRefund > maxRefundable + 0.01;
 
-            <div>
-              <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.4rem' }}>
-                Select Refund Mode:
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRefundMode('cash');
-                    setRefundAmount(refundingOrder.net_amount || refundingOrder.total_amount);
-                  }}
-                  className={`btn ${refundMode === 'cash' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{ flex: 1 }}
-                >
-                  💵 Cash Refund
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRefundMode('online');
-                    setRefundAmount(refundingOrder.net_amount || refundingOrder.total_amount);
-                  }}
-                  className={`btn ${refundMode === 'online' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{ flex: 1 }}
-                >
-                  💳 Online Refund
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRefundMode('split')}
-                  className={`btn ${refundMode === 'split' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{ flex: 1 }}
-                >
-                  ⚡ Both (Split)
-                </button>
+        return (
+          <Modal isOpen={Boolean(refundingOrder)} onClose={() => setRefundingOrder(null)} title={`Issue Refund for Order #${refundingOrder.order_number}`}>
+            <form onSubmit={handleProcessRefundSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ background: 'var(--bg-surface-elevated)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontWeight: 800, color: 'var(--brand-primary)', marginBottom: '0.2rem' }}>
+                  Table #{refundingOrder.table_number} • Order #{refundingOrder.order_number}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Total Net Order Bill: <b>{formatCurrency(maxRefundable)}</b>
+                </div>
               </div>
-            </div>
 
-            {refundMode === 'split' ? (
-              <>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                  Select Refund Mode:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.35rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefundMode('cash');
+                      setRefundAmount(maxRefundable);
+                    }}
+                    className={`btn ${refundMode === 'cash' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                    style={{ fontSize: '0.74rem' }}
+                  >
+                    💵 Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefundMode('online');
+                      setRefundAmount(maxRefundable);
+                    }}
+                    className={`btn ${refundMode === 'online' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                    style={{ fontSize: '0.74rem' }}
+                  >
+                    📱 Online
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefundMode('split');
+                      setRefundCashAmount('');
+                      setRefundOnlineAmount('');
+                    }}
+                    className={`btn ${refundMode === 'split' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                    style={{ fontSize: '0.74rem' }}
+                  >
+                    ⚡ Split
+                  </button>
+                </div>
+              </div>
+
+              {refundMode === 'split' ? (
+                <>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                      💵 Cash Refund Amount (₹):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={maxRefundable}
+                      value={refundCashAmount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRefundCashAmount(val);
+                        const cNum = Number(val) || 0;
+                        const rem = Math.max(0, maxRefundable - cNum);
+                        setRefundOnlineAmount(rem > 0 ? String(rem.toFixed(2)) : '0');
+                      }}
+                      className="input-field"
+                      placeholder="e.g. 100"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                      📱 Online / Card Refund Amount (₹):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={maxRefundable}
+                      value={refundOnlineAmount}
+                      onChange={(e) => setRefundOnlineAmount(e.target.value)}
+                      className="input-field"
+                      placeholder="e.g. 150"
+                    />
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: isOverRefund ? 'var(--danger)' : 'var(--text-main)' }}>
+                    Total Refund Summary: {formatCurrency(totalRequestedRefund)}
+                  </div>
+                </>
+              ) : (
                 <div>
                   <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-                    💵 Cash Refund Amount (₹):
+                    Refund Amount (₹ Editable):
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    min="0"
-                    value={refundCashAmount}
-                    onChange={(e) => setRefundCashAmount(e.target.value)}
+                    min="0.01"
+                    max={maxRefundable}
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    required
                     className="input-field"
-                    placeholder="e.g. 100"
+                    style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--danger)' }}
+                    placeholder="e.g. 50.00"
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-                    💳 Online Refund Amount (₹):
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={refundOnlineAmount}
-                    onChange={(e) => setRefundOnlineAmount(e.target.value)}
-                    className="input-field"
-                    placeholder="e.g. 150"
-                  />
+              )}
+
+              {/* OVER-REFUND WARNING ERROR ALERT */}
+              {isOverRefund && (
+                <div style={{
+                  background: 'var(--danger-bg)',
+                  color: 'var(--danger)',
+                  border: '1px solid var(--danger)',
+                  padding: '0.6rem 0.8rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}>
+                  <AlertCircle size={16} />
+                  <span>⚠ Money is over the order total (₹{maxRefundable.toFixed(2)})! Over payment/refund is not allowed.</span>
                 </div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--danger)' }}>
-                  Total Refund Amount: {formatCurrency((Number(refundCashAmount) || 0) + (Number(refundOnlineAmount) || 0))}
-                </div>
-              </>
-            ) : (
+              )}
+
               <div>
                 <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-                  Refund Amount (₹ Editable):
+                  Reason for Refund:
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="1"
-                  max={refundingOrder.net_amount || refundingOrder.total_amount}
-                  value={refundAmount}
-                  onChange={(e) => setRefundAmount(e.target.value)}
+                  type="text"
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
                   required
                   className="input-field"
-                  style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--danger)' }}
-                  placeholder="e.g. 50.00"
+                  placeholder="e.g. Item unavailable / Customer dissatisfied"
                 />
               </div>
-            )}
 
-            <div>
-              <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-                Reason for Refund:
-              </label>
-              <input
-                type="text"
-                value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
-                required
-                className="input-field"
-                placeholder="e.g. Item unavailable / Customer dissatisfied"
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <button type="submit" className="btn btn-danger btn-lg" style={{ flex: 1, fontWeight: 800, gap: '0.4rem' }}>
-                <RotateCcw size={16} />
-                <span>Confirm Refund</span>
-              </button>
-              <button type="button" onClick={() => setRefundingOrder(null)} className="btn btn-secondary btn-lg">
-                Cancel
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="submit"
+                  disabled={isOverRefund || totalRequestedRefund <= 0}
+                  className="btn btn-danger btn-lg"
+                  style={{
+                    flex: 1,
+                    fontWeight: 800,
+                    gap: '0.4rem',
+                    opacity: (isOverRefund || totalRequestedRefund <= 0) ? 0.5 : 1,
+                    cursor: (isOverRefund || totalRequestedRefund <= 0) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <RotateCcw size={16} />
+                  <span>Confirm Refund</span>
+                </button>
+                <button type="button" onClick={() => setRefundingOrder(null)} className="btn btn-secondary btn-lg">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
 
       {/* Modern GST Tax Invoice Bill Modal (Supports single bill or multi-order consolidated bill) */}
       <GSTInvoiceModal
@@ -1086,6 +1118,6 @@ export const DashboardOverview = ({ setActivePanel }) => {
         onClose={() => setPrintingOrders([])}
       />
 
-    </div>
+    </div >
   );
 };
