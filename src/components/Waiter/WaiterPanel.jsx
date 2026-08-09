@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { fetchAPI } from '../../utils/api';
 import { formatTime } from '../../utils/formatters';
 import { SocketContext } from '../../context/SocketContext';
@@ -6,7 +6,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { PageSkeleton } from '../Common/PageSkeleton';
 import { StaffLoginView } from '../Common/StaffLoginView';
 import { playWaiterVibrationAndChime } from '../../utils/sound';
-import { UserCheck, Bell, CheckCircle2, Clock, RefreshCw, Filter, Smartphone, Volume2 } from 'lucide-react';
+import { UserCheck, Bell, CheckCircle2, Clock, RefreshCw, Filter, Smartphone, Volume2, X, MessageCircle } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const WaiterPanel = ({ setActivePanel }) => {
@@ -19,6 +19,12 @@ export const WaiterPanel = ({ setActivePanel }) => {
   const [tableFilter, setTableFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('ready');
   const [lastVibratedTable, setLastVibratedTable] = useState(null);
+  // Deduplicate waiter chime — key = orderId+status to prevent repeated alerts
+  const lastAlertedKey = useRef(null);
+  // In-panel toast notifications
+  const [waiterToasts, setWaiterToasts] = useState([]);
+  // WhatsApp number from settings
+  const [waiterWhatsapp, setWaiterWhatsapp] = useState('');
 
   const loadOrders = useCallback(() => {
     setLoading(true);
@@ -29,19 +35,56 @@ export const WaiterPanel = ({ setActivePanel }) => {
   }, []);
 
   useEffect(() => {
-    if (user) loadOrders();
+    if (user) {
+      loadOrders();
+      // Fetch whatsapp number from settings if available
+      fetchAPI('/settings').then(s => {
+        if (s && s.waiter_whatsapp_number) setWaiterWhatsapp(s.waiter_whatsapp_number);
+      }).catch(() => {});
+    }
   }, [user, loadOrders]);
+
+  const addToast = (toast) => {
+    const id = Date.now();
+    setWaiterToasts(prev => [{ ...toast, id }, ...prev.slice(0, 2)]);
+    setTimeout(() => setWaiterToasts(prev => prev.filter(t => t.id !== id)), 8000);
+  };
 
   useEffect(() => {
     if (!socket || !user) return;
     joinRoom('kitchen');
 
+    const handleNewOrder = (data) => {
+      loadOrders();
+      const tableNum = data?.table_number || data?.tableNumber;
+      const items = (data?.items || []).map(i => i.item_name || i.name).filter(Boolean);
+      const itemSummary = items.slice(0, 3).join(', ') + (items.length > 3 ? '...' : '');
+      addToast({
+        type: 'new_order',
+        title: '🔔 New Order Received!',
+        message: `Table #${tableNum || '?'} • ${items.length} item${items.length !== 1 ? 's' : ''}`,
+        detail: itemSummary,
+        tableNum,
+        orderData: data
+      });
+    };
+
     const handleOrderUpdate = (data) => {
       loadOrders();
       if (data && (data.status === 'ready' || (data.items && data.items.some(i => i.status === 'ready')))) {
         const tableNum = data.table_number || data.tableNumber;
+        const alertKey = `${data.id || data.order_number}_ready`;
+        if (lastAlertedKey.current === alertKey) return;
+        lastAlertedKey.current = alertKey;
         setLastVibratedTable(tableNum || 'Active Table');
         try { playWaiterVibrationAndChime(tableNum); } catch (e) {}
+        addToast({
+          type: 'ready',
+          title: '🚀 Ready for Delivery!',
+          message: `Order is ready — Table #${tableNum || '?'}`,
+          tableNum,
+          orderData: data
+        });
       }
     };
 
@@ -49,18 +92,28 @@ export const WaiterPanel = ({ setActivePanel }) => {
       loadOrders();
       if (data && (data.status === 'ready' || data.newStatus === 'ready')) {
         const tableNum = data.table_number || data.tableNumber;
+        const alertKey = `item_${data.itemId || data.id}_ready`;
+        if (lastAlertedKey.current === alertKey) return;
+        lastAlertedKey.current = alertKey;
         setLastVibratedTable(tableNum || 'Active Table');
         try { playWaiterVibrationAndChime(tableNum); } catch (e) {}
+        addToast({
+          type: 'ready',
+          title: '🚀 Order Ready for Delivery!',
+          message: `New order is ready — Table #${tableNum || '?'}`,
+          tableNum,
+          itemName: data.itemName || data.item_name
+        });
       }
     };
 
-    socket.on('new_order', handleOrderUpdate);
+    socket.on('new_order', handleNewOrder);
     socket.on('order_updated', handleOrderUpdate);
     socket.on('item_status_updated', handleItemStatusUpdated);
     socket.on('table_order_updated', handleOrderUpdate);
 
     return () => {
-      socket.off('new_order', handleOrderUpdate);
+      socket.off('new_order', handleNewOrder);
       socket.off('order_updated', handleOrderUpdate);
       socket.off('item_status_updated', handleItemStatusUpdated);
       socket.off('table_order_updated', handleOrderUpdate);
@@ -85,7 +138,9 @@ export const WaiterPanel = ({ setActivePanel }) => {
   };
 
   if (!user) {
-    return <StaffLoginView defaultRole="waiter" onLoginSuccess={(target) => setActivePanel && setActivePanel(target)} />;
+    return <StaffLoginView defaultRole="waiter" onLoginSuccess={(target, loggedUser) => {
+      if (loggedUser && setActivePanel) setActivePanel(target);
+    }} />;
   }
 
   let filteredOrders = [...orders];
@@ -342,17 +397,66 @@ export const WaiterPanel = ({ setActivePanel }) => {
 
   return (
     <div className="container" style={{ padding: '1.5rem 1rem 4rem' }}>
-      {/* Alert Banner */}
-      {lastVibratedTable && (
-        <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', padding: '0.85rem 1.25rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 8px 25px rgba(16,185,129,0.4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 800, fontSize: '0.95rem' }}>
-            <Smartphone size={22} />
-            <Volume2 size={22} />
-            <span>📳 CHEF ALERT: Dish Ready — Table #{lastVibratedTable}! (Device Alerting)</span>
-          </div>
-          <button onClick={() => setLastVibratedTable(null)} style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.3rem 0.6rem', fontWeight: 800, cursor: 'pointer' }}>
-            Dismiss
-          </button>
+      {/* Toast Notification Stack */}
+      {waiterToasts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
+          {waiterToasts.map(toast => (
+            <div
+              key={toast.id}
+              className="animate-slide-in"
+              style={{
+                background: toast.type === 'new_order'
+                  ? 'linear-gradient(135deg, #f97316, #ea580c)'
+                  : 'linear-gradient(135deg, #10b981, #059669)',
+                color: '#fff',
+                borderRadius: '14px',
+                padding: '0.85rem 1.1rem',
+                boxShadow: toast.type === 'new_order'
+                  ? '0 8px 25px rgba(249,115,22,0.45)'
+                  : '0 8px 25px rgba(16,185,129,0.4)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.65rem'
+              }}
+            >
+              <div style={{ fontSize: '1.5rem', flexShrink: 0 }}>
+                {toast.type === 'new_order' ? '🔔' : '🚀'}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: '0.92rem' }}>{toast.title}</div>
+                <div style={{ fontSize: '0.82rem', opacity: 0.95, marginTop: '0.15rem' }}>{toast.message}</div>
+                {toast.detail && (
+                  <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '0.1rem', fontStyle: 'italic' }}>{toast.detail}</div>
+                )}
+                {toast.type === 'new_order' && waiterWhatsapp && (
+                  <a
+                    href={`https://wa.me/${waiterWhatsapp.replace(/[^0-9]/g,'')}?text=${encodeURIComponent(`🔔 New Order Alert!
+Table: #${toast.tableNum || '?'}
+${toast.detail ? 'Items: ' + toast.detail : ''}
+Please prepare for delivery.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                      marginTop: '0.4rem',
+                      background: 'rgba(255,255,255,0.2)', color: '#fff',
+                      borderRadius: '8px', padding: '0.3rem 0.7rem',
+                      textDecoration: 'none', fontWeight: 800, fontSize: '0.78rem'
+                    }}
+                  >
+                    <MessageCircle size={14} />
+                    Open WhatsApp
+                  </a>
+                )}
+              </div>
+              <button
+                onClick={() => setWaiterToasts(prev => prev.filter(t => t.id !== toast.id))}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '7px', color: '#fff', cursor: 'pointer', padding: '0.25rem 0.5rem', fontWeight: 800, flexShrink: 0 }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

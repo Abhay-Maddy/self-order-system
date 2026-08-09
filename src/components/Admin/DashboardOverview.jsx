@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { fetchAPI } from '../../utils/api';
 import { formatCurrency, formatTime, getTodayDateString, getLocalDateString } from '../../utils/formatters';
 import { Modal } from '../Common/Modal';
@@ -37,6 +37,8 @@ export const DashboardOverview = ({ setActivePanel }) => {
   const [refundReason, setRefundReason] = useState('Customer Requested Refund');
 
   const dateInputRef = useRef(null);
+  // Deduplicate chime: track last announced order ID to avoid double-play
+  const lastAnnouncedOrderId = useRef(null);
 
   const loadData = () => {
     setLoadingOrders(true);
@@ -76,7 +78,11 @@ export const DashboardOverview = ({ setActivePanel }) => {
 
     const handleNewOrder = (newOrder) => {
       console.log('⚡ Admin Dashboard received real-time new order:', newOrder);
-      playKitchenChime(newOrder.table_number);
+      // Only play chime once per unique order (avoid double-play with BellAlert)
+      const orderId = newOrder?.id || newOrder?.order_number;
+      if (orderId && lastAnnouncedOrderId.current === orderId) return;
+      lastAnnouncedOrderId.current = orderId;
+      playKitchenChime(newOrder.table_number, newOrder.items);
 
       setOrders(prevOrders => {
         const existingIdx = prevOrders.findIndex(o => o.id === newOrder.id || o.order_number === newOrder.order_number);

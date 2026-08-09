@@ -4,7 +4,7 @@ import { fetchAPI } from '../../utils/api';
 import { Modal } from '../Common/Modal';
 import { Lock, ChefHat, Shield, CreditCard, UserCheck, ArrowRight, Eye, EyeOff, HelpCircle } from 'lucide-react';
 
-export const StaffLoginView = ({ onLoginSuccess, defaultRole = 'chef' }) => {
+export const StaffLoginView = ({ onLoginSuccess, defaultRole = 'admin' }) => {
   const { login } = useContext(AuthContext);
 
   const [mode, setMode] = useState('login'); // 'login' or 'register'
@@ -52,7 +52,8 @@ export const StaffLoginView = ({ onLoginSuccess, defaultRole = 'chef' }) => {
       else if (['admin', 'cashier'].includes(loggedUser.role)) targetPanel = 'admin';
 
       if (onLoginSuccess) {
-        onLoginSuccess(targetPanel);
+        // Pass both the panel name (for legacy) and the full user object (for URL routing)
+        onLoginSuccess(targetPanel, loggedUser);
       }
     } catch (err) {
       setErrorMsg(err.message || 'Invalid username or password');
@@ -303,10 +304,10 @@ export const StaffLoginView = ({ onLoginSuccess, defaultRole = 'chef' }) => {
                 className="input-field"
                 style={{ fontWeight: 700 }}
               >
+                <option value="admin">📊 Sub-Admin</option>
+                <option value="cashier">💳 Billing Cashier</option>
                 <option value="chef">👨‍🍳 Chef / Kitchen</option>
                 <option value="waiter">🤵 Waiter / Server</option>
-                <option value="cashier">💳 Billing Cashier</option>
-                <option value="admin">📊 Sub-Admin</option>
               </select>
             </div>
 

@@ -255,74 +255,121 @@ h1, h2, h3, h4, h5, h6 {
   50% { opacity: 0.4; }
 }
 
-/* Fluid Screen Responsiveness & Mobile-First UX */
+/* ============================================================
+   MOBILE-FIRST RESPONSIVE DESIGN
+   Target: phone browsers (≤768px) — not just scaled-down laptop
+   ============================================================ */
 @media (max-width: 768px) {
   .container {
-    padding: 0 0.6rem;
+    padding: 0 0.5rem;
   }
+
   .input-field {
-    font-size: 0.9rem;
-    padding: 0.6rem 0.8rem;
-    min-height: 40px;
+    font-size: 1rem; /* Prevent iOS auto-zoom (≥16px) */
+    padding: 0.7rem 0.85rem;
+    min-height: 44px; /* Apple HIG touch target */
   }
+
   .btn {
-    padding: 0.6rem 0.9rem;
-    font-size: 0.85rem;
-    min-height: 38px;
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
+    min-height: 44px;
     touch-action: manipulation;
   }
+
+  .btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+    min-height: 38px;
+  }
+
   .badge {
     font-size: 0.7rem;
     padding: 0.2rem 0.5rem;
   }
-  
-  /* Horizontal Touch Scrolling for Data Tables on Mobile */
+
+  /* Horizontal touch scrolling for data tables on mobile */
   .table-responsive {
     width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  
-  /* Full width bottom-sheet modals on mobile screens */
+
+  /* Card radius maintained on mobile */
   .glass-card {
     border-radius: 12px;
   }
 
+  /* Full-width bottom-sheet modals on mobile screens */
   .modal-overlay {
     align-items: flex-end !important;
     padding: 0 !important;
   }
-  
+
   .modal-container {
     max-width: 100% !important;
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
     border-top-left-radius: 20px !important;
     border-top-right-radius: 20px !important;
-    max-height: 85vh !important;
+    max-height: 90vh !important;
     padding: 1.25rem 1rem !important;
     margin: 0 !important;
+    overflow-y: auto;
+  }
+
+  /* Navbar text: hide subtitle on very narrow */
+  .navbar-subtitle {
+    display: none;
+  }
+
+  /* Make sure main content doesn't get cropped on mobile */
+  main {
+    min-height: calc(100vh - 120px);
+    padding-bottom: 5rem; /* space for floating bottom cart bar */
   }
 }
 
+/* Extra-small phones (≤480px) */
 @media (max-width: 480px) {
   body {
-    font-size: 0.88rem;
+    font-size: 0.9rem;
   }
+
   .container {
     padding: 0 0.4rem;
   }
-  h1 { font-size: 1.35rem; }
-  h2 { font-size: 1.15rem; }
-  h3 { font-size: 1rem; }
-  
+
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.1rem; }
+  h3 { font-size: 0.95rem; }
+
   .btn-lg {
-    padding: 0.7rem 1.25rem;
+    padding: 0.75rem 1.25rem;
     font-size: 0.95rem;
   }
-  
-  /* Ensure floating action bars don't obscure content on small mobile screens */
+
+  /* Floating action bars don't obscure content on small mobile screens */
   main, .app-content {
     padding-bottom: 90px;
   }
+
+  /* Menu grid: 2 cols on small phones */
+  .menu-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Category tabs scroll without overflow bleed */
+  .category-tabs-wrapper {
+    padding: 0 !important;
+    margin: 0 -0.4rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .category-tabs-wrapper::-webkit-scrollbar {
+    display: none;
+  }
 }
+

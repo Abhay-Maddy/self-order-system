@@ -16,13 +16,16 @@ export const CheckoutModal = ({
   orderFor = 'customer',
   appliedCoupon,
   activeOrder,
+  user = null,
+  tables = [],
+  hasTableParam = false,
   onPlaceOrderSuccess
 }) => {
   const { t } = useContext(LanguageContext);
   const isMobileSmall = useIsMobile(480);
 
   const [paymentMode, setPaymentMode] = useState('online'); // 'online' or 'cash'
-  const [onlineOption, setOnlineOption] = useState('upi_qr'); // 'upi_qr', 'upi_id', 'card'
+  const [onlineOption, setOnlineOption] = useState('upi_qr'); // 'upi_qr', 'upi_apps', 'card'
   const [customerPhone, setCustomerPhone] = useState('');
   const [upiIdInput, setUpiIdInput] = useState('');
   const [scheduledTime, setScheduledTime] = useState('ASAP (~15 mins)');
@@ -30,6 +33,12 @@ export const CheckoutModal = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('idle'); // 'idle', 'verifying', 'success'
+
+  // Guest table selection: shown when user is NOT logged in and no QR table param
+  const [guestTable, setGuestTable] = useState(tableNumber || 'T-01');
+  const isGuest = !user;
+  const showTableSelector = isGuest && !hasTableParam;
+  const effectiveTable = showTableSelector ? guestTable : tableNumber;
 
   useEffect(() => {
     if (activeOrder && activeOrder.customer_phone) {
@@ -69,7 +78,9 @@ export const CheckoutModal = ({
   if (!isOpen) return null;
 
   const handleConfirmOrder = async () => {
-    if (orderFor === 'customer' && (!tableNumber || tableNumber === 'None' || !tableNumber.trim())) {
+    const finalTable = showTableSelector ? guestTable : tableNumber;
+
+    if (orderFor === 'customer' && (!finalTable || finalTable === 'None' || !String(finalTable).trim())) {
       setErrorMessage('⚠ Table selection is COMPULSORY for Customer orders! Please choose a valid table number.');
       return;
     }
@@ -96,18 +107,43 @@ export const CheckoutModal = ({
         await new Promise(resolve => setTimeout(resolve, 600));
       }
 
+      // Determine placed_by metadata based on user login state and orderFor
+      let placedByName = '';
+      let placedByRole = '';
+      let orderSource = 'customer';
+
+      if (user) {
+        // Logged-in user
+        placedByName = user.name || user.username || '';
+        if (orderFor === 'self') {
+          placedByRole = 'self';
+          orderSource = 'self';
+        } else {
+          placedByRole = 'staff_for_customer';
+          orderSource = 'customer';
+        }
+      } else {
+        // Guest (not logged in)
+        placedByName = '';
+        placedByRole = 'guest';
+        orderSource = 'customer';
+      }
+
       const orderPayload = {
-        table_number: tableNumber,
+        table_number: finalTable,
         customer_phone: customerPhone || null,
         payment_mode: paymentMode,
         payment_status: paymentMode === 'online' ? 'completed' : 'pending',
         utr_reference: upiIdInput || null,
         scheduled_time: scheduledTime,
-        order_source: 'customer',
+        order_source: orderSource,
+        placed_by_name: placedByName,
+        placed_by_role: placedByRole,
         coupon_code: appliedCoupon ? appliedCoupon.code : null,
         items: safeCart
       };
 
+      setIsCheckoutOpen && setIsCheckoutOpen(false);
       await onPlaceOrderSuccess(orderPayload);
       onClose();
     } catch (err) {
@@ -119,8 +155,32 @@ export const CheckoutModal = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Checkout & Payment - Table #${tableNumber}`}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Checkout & Payment${effectiveTable && effectiveTable !== 'None' ? ` — Table #${effectiveTable}` : ''}`}>
       <div>
+        {/* Guest Table Selector — only shown when not logged in and no QR param */}
+        {showTableSelector && (
+          <div style={{ marginBottom: '1.25rem', padding: '0.9rem', background: 'rgba(249,115,22,0.08)', border: '2px solid var(--brand-primary)', borderRadius: '12px' }}>
+            <label style={{ display: 'block', fontWeight: 800, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--brand-primary)' }}>
+              👥 Select Your Table Number
+            </label>
+            <select
+              value={guestTable}
+              onChange={e => setGuestTable(e.target.value)}
+              className="input-field"
+              style={{ fontWeight: 700 }}
+            >
+              {(tables.length > 0 ? tables : [
+                { table_number: 'T-01' }, { table_number: 'T-02' }, { table_number: 'T-03' },
+                { table_number: 'T-04' }, { table_number: 'T-05' }, { table_number: 'T-06' }
+              ]).map((tb, i) => (
+                <option key={i} value={tb.table_number}>Table #{tb.table_number}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+              ℹ️ Choose the table number shown at your table
+            </div>
+          </div>
+        )}
         {/* Mobile Number Input (Compulsory) */}
         <div style={{ marginBottom: '1.25rem' }}>
           <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.4rem', fontSize: '0.85rem' }}>

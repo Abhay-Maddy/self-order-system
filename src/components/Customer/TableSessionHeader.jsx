@@ -39,57 +39,6 @@ export const TableSessionHeader = ({
 
   return (
     <div className="glass-card" style={{ padding: '0.85rem 1rem', marginBottom: '1.25rem', position: 'relative', zIndex: 50 }}>
-      {/* Order Purpose & Table Selector Bar for Staff/Admin & Customers */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem', paddingBottom: '0.65rem', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
-        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <span>ORDER FOR:</span>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '0.35rem' }}>
-          <button
-            type="button"
-            onClick={() => {
-              if (setOrderFor) setOrderFor('self');
-            }}
-            className={`btn btn-sm ${orderFor === 'self' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', fontWeight: 800 }}
-          >
-            🙋‍♂️ Self / Staff
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (setOrderFor) setOrderFor('customer');
-              if (selectedTable === 'None' && setSelectedTable) setSelectedTable('T-01');
-            }}
-            className={`btn btn-sm ${orderFor === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', fontWeight: 800 }}
-          >
-            👥 Customer
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: orderFor === 'customer' ? 'var(--danger)' : 'var(--text-muted)' }}>
-            TABLE {orderFor === 'customer' && '*'}:
-          </span>
-          {hasTableParam ? (
-            <span className="badge badge-primary" style={{ fontWeight: 800, fontSize: '0.8rem' }}>Table #{selectedTable}</span>
-          ) : (
-            <select
-              value={selectedTable || (orderFor === 'self' ? 'None' : 'T-01')}
-              onChange={(e) => setSelectedTable && setSelectedTable(e.target.value)}
-              className="input-field"
-              style={{ width: '130px', padding: '0.3rem 0.4rem', fontSize: '0.8rem', fontWeight: 700, height: '32px' }}
-            >
-              {orderFor === 'self' && <option value="None">None (Takeaway)</option>}
-              {tableList.map((tb, idx) => (
-                <option key={idx} value={tb.table_number}>Table #{tb.table_number}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
       {/* Top Header Bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
 
@@ -113,28 +62,60 @@ export const TableSessionHeader = ({
           </div>
         )}
 
-        {/* Go to Admin Panel Button (Rendered only for logged in staff when NOT accessing via QR code) */}
-        {user && !hasTableParam && setActivePanel && (
-          <button
-            type="button"
-            onClick={() => setActivePanel && setActivePanel('admin')}
-            className="btn btn-primary"
-            style={{
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              gap: '0.4rem',
-              borderRadius: '10px',
-              boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
-              whiteSpace: 'nowrap',
-              background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)'
-            }}
-            title="Return to Admin Panel"
-          >
-            <LayoutDashboard size={16} />
-            <span>Go to Admin Panel</span>
-          </button>
-        )}
+        {/* Back to Dashboard Button — role-aware */}
+        {user && setActivePanel && (() => {
+          const isWaiter = user.role === 'waiter' || user.username === 'waiter1' || (user.name && user.name.toLowerCase().includes('waiter'));
+          const isChef = user.role === 'chef' || user.username === 'chef1' || (user.name && user.name.toLowerCase().includes('chef'));
+          const isAdmin = ['admin', 'cashier'].includes(user.role);
+
+          if (isWaiter || isChef) {
+            const targetPanel = isWaiter ? 'waiter' : 'kitchen';
+            const label = isWaiter ? '← Waiter Dashboard' : '← Kitchen Dashboard';
+            return (
+              <button
+                type="button"
+                onClick={() => setActivePanel(targetPanel)}
+                className="btn btn-secondary"
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  gap: '0.4rem',
+                  borderRadius: '10px',
+                  border: '1px solid var(--brand-primary)',
+                  color: 'var(--brand-primary)',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Return to your staff dashboard"
+              >
+                {label}
+              </button>
+            );
+          } else if (isAdmin) {
+            return (
+              <button
+                type="button"
+                onClick={() => setActivePanel('admin')}
+                className="btn btn-primary"
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  gap: '0.4rem',
+                  borderRadius: '10px',
+                  boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
+                  whiteSpace: 'nowrap',
+                  background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)'
+                }}
+                title="Return to Admin Panel"
+              >
+                <LayoutDashboard size={16} />
+                <span>Admin Panel</span>
+              </button>
+            );
+          }
+          return null;
+        })()}
 
         {/* Search Box */}
         <div style={{ flex: 1, position: 'relative', minWidth: '180px' }}>
@@ -312,17 +293,39 @@ export const TableSessionHeader = ({
               </button>
             )}
 
-            {/* 5. Go to Admin Panel Option in Menu (Only for logged in staff when NOT on QR scan) */}
-            {user && !hasTableParam && setActivePanel && (
-              <button
-                onClick={() => { setIsMenuOpen(false); setActivePanel && setActivePanel('admin'); }}
-                className="btn btn-secondary"
-                style={{ width: '100%', justifyContent: 'flex-start', gap: '0.6rem', padding: '0.65rem 0.85rem', borderColor: 'var(--brand-primary)', fontWeight: 700 }}
-              >
-                <LayoutDashboard size={18} style={{ color: 'var(--brand-primary)' }} />
-                <span>Go to Admin Panel</span>
-              </button>
-            )}
+            {/* 5. Go to Dashboard Button — role-aware, inside hamburger menu */}
+            {user && setActivePanel && (() => {
+              const isWaiter = user.role === 'waiter' || user.username === 'waiter1' || (user.name && user.name.toLowerCase().includes('waiter'));
+              const isChef = user.role === 'chef' || user.username === 'chef1' || (user.name && user.name.toLowerCase().includes('chef'));
+              const isAdmin = ['admin', 'cashier'].includes(user.role);
+
+              if (isWaiter || isChef) {
+                const targetPanel = isWaiter ? 'waiter' : 'kitchen';
+                const label = isWaiter ? '← Back to Waiter Dashboard' : '← Back to Kitchen Dashboard';
+                return (
+                  <button
+                    onClick={() => { setIsMenuOpen(false); setActivePanel(targetPanel); }}
+                    className="btn btn-secondary"
+                    style={{ width: '100%', justifyContent: 'flex-start', gap: '0.6rem', padding: '0.65rem 0.85rem', borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)', fontWeight: 700 }}
+                  >
+                    <ArrowLeft size={18} style={{ color: 'var(--brand-primary)' }} />
+                    <span>{label}</span>
+                  </button>
+                );
+              } else if (isAdmin) {
+                return (
+                  <button
+                    onClick={() => { setIsMenuOpen(false); setActivePanel('admin'); }}
+                    className="btn btn-secondary"
+                    style={{ width: '100%', justifyContent: 'flex-start', gap: '0.6rem', padding: '0.65rem 0.85rem', borderColor: 'var(--brand-primary)', fontWeight: 700 }}
+                  >
+                    <LayoutDashboard size={18} style={{ color: 'var(--brand-primary)' }} />
+                    <span>Go to Admin Panel</span>
+                  </button>
+                );
+              }
+              return null;
+            })()}
 
             {/* 6. Comprehensive Sort & Filter Options */}
             <div style={{ marginTop: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>

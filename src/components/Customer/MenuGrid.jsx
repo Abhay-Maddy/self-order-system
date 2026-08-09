@@ -2,9 +2,11 @@ import React, { useContext } from 'react';
 import { formatCurrency } from '../../utils/formatters';
 import { LanguageContext } from '../../context/LanguageContext';
 import { Plus, Flame, AlertCircle } from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export const MenuGrid = ({ items, onSelectItem, onDirectAddToCart }) => {
   const { t } = useContext(LanguageContext);
+  const isMobile = useIsMobile(480);
 
   if (!items || items.length === 0) {
     return (
@@ -15,11 +17,14 @@ export const MenuGrid = ({ items, onSelectItem, onDirectAddToCart }) => {
   }
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-      gap: '1.25rem'
-    }}>
+    <div
+      className="menu-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: isMobile ? '0.6rem' : '1.25rem'
+      }}
+    >
       {items.map(item => {
         const isOutOfStock = item.stock_quantity <= 0;
         const isLowStock = item.stock_quantity > 0 && item.stock_quantity <= item.low_stock_threshold;
@@ -39,7 +44,7 @@ export const MenuGrid = ({ items, onSelectItem, onDirectAddToCart }) => {
             }}
           >
             {/* Image & Badges */}
-            <div style={{ position: 'relative', height: '180px', width: '100%', overflow: 'hidden' }}>
+            <div style={{ position: 'relative', height: isMobile ? '120px' : '180px', width: '100%', overflow: 'hidden' }}>
               <img
                 src={item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600'}
                 alt={item.name}
@@ -77,9 +82,9 @@ export const MenuGrid = ({ items, onSelectItem, onDirectAddToCart }) => {
             </div>
 
             {/* Content */}
-            <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ padding: isMobile ? '0.6rem' : '1rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
-                <h3 style={{ fontSize: '1.05rem', marginBottom: '0.2rem' }}>{item.name}</h3>
+                <h3 style={{ fontSize: isMobile ? '0.85rem' : '1.05rem', marginBottom: '0.2rem', lineHeight: 1.3 }}>{item.name}</h3>
                 {item.subtitle && (
                   <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--brand-primary)', marginBottom: '0.4rem' }}>
                     {item.subtitle}

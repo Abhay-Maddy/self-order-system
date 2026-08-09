@@ -69,8 +69,23 @@ export const UserProfileModal = ({ isOpen, onClose }) => {
             {(user.name || user.username).charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{user.name} ({user.role ? user.role.toUpperCase() : 'STAFF'})</div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}><strong>{user.username}</strong></span>
+            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{user.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}><strong>{user.username}</strong></span>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '0.15rem 0.55rem',
+                borderRadius: '20px',
+                background: user.role === 'admin' ? 'rgba(249,115,22,0.15)' : user.role === 'chef' ? 'rgba(16,185,129,0.15)' : user.role === 'waiter' ? 'rgba(99,102,241,0.15)' : 'rgba(59,130,246,0.15)',
+                color: user.role === 'admin' ? 'var(--brand-primary)' : user.role === 'chef' ? '#10b981' : user.role === 'waiter' ? '#818cf8' : '#3b82f6',
+                border: `1px solid ${user.role === 'admin' ? 'rgba(249,115,22,0.3)' : user.role === 'chef' ? 'rgba(16,185,129,0.3)' : user.role === 'waiter' ? 'rgba(99,102,241,0.3)' : 'rgba(59,130,246,0.3)'}`,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}>
+                {user.role === 'admin' ? '📊 Admin' : user.role === 'chef' ? '👨‍🍳 Chef' : user.role === 'waiter' ? '🤵 Waiter' : user.role === 'cashier' ? '💳 Cashier' : user.role}
+              </span>
+            </div>
           </div>
         </div>
 

@@ -1,20 +1,31 @@
 import React, { useContext, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import { LangToggle } from './LangToggle';
 import { UserProfileModal } from './UserProfileModal';
 import { StaffLoginModal } from './StaffLoginModal';
 import { AuthContext } from '../../context/AuthContext';
 import { LanguageContext } from '../../context/LanguageContext';
-import { Utensils, ChefHat, LayoutDashboard, LogOut, Settings, Lock, UserCheck } from 'lucide-react';
+import { getPanelPath } from '../../utils/panelPath';
+import { Utensils, LogOut, Settings, Lock } from 'lucide-react';
 
-export const Navbar = ({ activePanel, setActivePanel }) => {
+export const Navbar = ({ setActivePanel }) => {
   const { user, logout } = useContext(AuthContext);
   const { t } = useContext(LanguageContext);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isStaffLoginOpen, setIsStaffLoginOpen] = useState(false);
 
   // Check if table parameter is present in URL (e.g. ?table=T-01)
   const hasTableParam = Boolean(new URLSearchParams(window.location.search).get('table'));
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const isOnLogin = location.pathname === '/login';
 
   return (
     <header style={{
@@ -27,8 +38,11 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
       padding: '0.75rem 0'
     }}>
       <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {/* Brand Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }} onClick={() => setActivePanel('customer')}>
+        {/* Brand Logo — always goes home */}
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}
+          onClick={() => navigate('/')}
+        >
           <div style={{
             background: 'linear-gradient(135deg, var(--brand-primary), #f59e0b)',
             padding: '0.5rem',
@@ -42,20 +56,18 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
           </div>
           <div>
             <h2 style={{ fontSize: '1.25rem', lineHeight: '1.1' }}>Aamantran</h2>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>Self-Ordering Platform</span>
+            <span className="navbar-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>Self-Ordering Platform</span>
           </div>
         </div>
 
-
-
         {/* Right Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          {/* Staff Login Button: Hidden when customer accesses via QR code scan */}
-          {!user && !hasTableParam && (
+          {/* Staff Login Button: Hidden when customer accesses via QR code scan or already on login page */}
+          {!user && !hasTableParam && !isOnLogin && (
             <button
-              onClick={() => setActivePanel('staff-login')}
-              className={`btn btn-sm ${activePanel === 'staff-login' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.8rem', fontWeight: 700, gap: '0.35rem', borderColor: 'var(--brand-primary)', color: activePanel === 'staff-login' ? '#fff' : 'var(--brand-primary)' }}
+              onClick={() => navigate('/login')}
+              className="btn btn-sm btn-secondary"
+              style={{ fontSize: '0.8rem', fontWeight: 700, gap: '0.35rem', borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
               title="Staff & Admin Portal Sign In"
             >
               <Lock size={13} />
@@ -68,14 +80,12 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
 
           {user ? (
             (() => {
-              const isWaiter = user.role === 'waiter' || (user.name && user.name.toLowerCase().includes('waiter')) || user.username === 'waiter1';
-              const isChef = user.role === 'chef' || (user.name && user.name.toLowerCase().includes('chef')) || user.username === 'chef1';
-              const targetPanel = isWaiter ? 'waiter' : isChef ? 'kitchen' : 'admin';
+              const panelPath = getPanelPath(user);
 
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span
-                    onClick={() => setActivePanel(targetPanel)}
+                    onClick={() => navigate(panelPath)}
                     style={{
                       fontSize: '0.82rem',
                       fontWeight: 800,
@@ -96,14 +106,14 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
                   </span>
 
                   <button
-                    onClick={() => setIsProfileOpen(true)}
+                    onClick={() => navigate('/profile')}
                     className="btn btn-secondary btn-sm"
                     title="Edit My Profile & Credentials"
                     style={{ fontSize: '0.8rem', fontWeight: 600, gap: '0.3rem', padding: '0.4rem 0.6rem' }}
                   >
                     <Settings size={14} />
                   </button>
-                  <button onClick={logout} className="btn btn-secondary btn-sm" title="Log Out" style={{ padding: '0.4rem 0.6rem' }}>
+                  <button onClick={handleLogout} className="btn btn-secondary btn-sm" title="Log Out" style={{ padding: '0.4rem 0.6rem' }}>
                     <LogOut size={14} />
                   </button>
                 </div>
@@ -121,7 +131,10 @@ export const Navbar = ({ activePanel, setActivePanel }) => {
       <StaffLoginModal
         isOpen={isStaffLoginOpen}
         onClose={() => setIsStaffLoginOpen(false)}
-        onLoginSuccess={(targetPanel) => setActivePanel(targetPanel)}
+        onLoginSuccess={(targetPanel, loggedUser) => {
+          setIsStaffLoginOpen(false);
+          if (loggedUser) navigate(getPanelPath(loggedUser));
+        }}
       />
     </header>
   );

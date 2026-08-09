@@ -11,6 +11,7 @@ import { StaffLoginView } from '../Common/StaffLoginView';
 import { ChefHat, Printer } from 'lucide-react';
 import { getTodayDateString, formatTime } from '../../utils/formatters';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useRef } from 'react';
 
 export const KitchenPanel = ({ setActivePanel }) => {
   const { user } = useContext(AuthContext);
@@ -23,6 +24,8 @@ export const KitchenPanel = ({ setActivePanel }) => {
   const [loading, setLoading] = useState(true);
   const [rejectingItem, setRejectingItem] = useState(null);
   const [printingOrders, setPrintingOrders] = useState([]);
+  // Deduplicate chime: track last announced order ID
+  const lastAnnouncedOrderId = useRef(null);
 
   // Checkbox selection & search state
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
@@ -60,7 +63,13 @@ export const KitchenPanel = ({ setActivePanel }) => {
     joinRoom('kitchen');
 
     const onNew = (newOrder) => {
-      try { playKitchenChime(newOrder?.table_number); } catch (e) { }
+      const orderId = newOrder?.id || newOrder?.order_number;
+      if (orderId && lastAnnouncedOrderId.current === orderId) {
+        loadActiveOrders();
+        return;
+      }
+      lastAnnouncedOrderId.current = orderId;
+      try { playKitchenChime(newOrder?.table_number, newOrder?.items); } catch (e) { }
       loadActiveOrders();
     };
     const onUpdate = () => loadActiveOrders();
@@ -115,7 +124,9 @@ export const KitchenPanel = ({ setActivePanel }) => {
   };
 
   if (!user) {
-    return <StaffLoginView defaultRole="chef" onLoginSuccess={(target) => setActivePanel && setActivePanel(target)} />;
+    return <StaffLoginView defaultRole="chef" onLoginSuccess={(target, loggedUser) => {
+      if (loggedUser && setActivePanel) setActivePanel(target);
+    }} />;
   }
 
   let processedOrders = [...orders];

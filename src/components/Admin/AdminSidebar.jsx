@@ -1,7 +1,14 @@
-import React from 'react';
-import { LayoutDashboard, Utensils, QrCode, Users, Package, Tag, FileText, Settings, CreditCard, RotateCcw, ShoppingBag, Star } from 'lucide-react';
+import React, { useContext } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { AuthContext } from '../../context/AuthContext';
+import { LayoutDashboard, Utensils, QrCode, Users, Package, Tag, FileText, Settings, CreditCard, RotateCcw, Star } from 'lucide-react';
 
 export const AdminSidebar = ({ activeTab, setActiveTab, role, setActivePanel }) => {
+  const navigate = useNavigate();
+  const { name: urlName } = useParams();
+  const { user } = useContext(AuthContext);
+  const staffName = urlName || encodeURIComponent((user?.name || user?.username || 'admin').toLowerCase().replace(/\s+/g, '-'));
+
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['admin', 'cashier'] },
     { id: 'billing', label: 'Invoices', icon: CreditCard, roles: ['admin', 'cashier'] },
@@ -18,7 +25,7 @@ export const AdminSidebar = ({ activeTab, setActiveTab, role, setActivePanel }) 
   ];
 
   return (
-    <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+    <div className="glass-card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', overflow: 'hidden' }}>
       {navItems.filter(item => item.roles.includes(role)).map(item => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
@@ -40,9 +47,12 @@ export const AdminSidebar = ({ activeTab, setActiveTab, role, setActivePanel }) 
               <Icon size={18} />
               <span>{item.label}</span>
             </button>
-            {item.id === 'overview' && setActivePanel && (
+            {item.id === 'overview' && (
               <button
-                onClick={() => setActivePanel('customer')}
+                onClick={() => {
+                  const prefix = role === 'cashier' ? 'cashier' : 'admin';
+                  navigate(`/${prefix}/${staffName}/customer-menu`);
+                }}
                 className="btn btn-secondary"
                 style={{
                   justifyContent: 'flex-start',
@@ -58,7 +68,7 @@ export const AdminSidebar = ({ activeTab, setActiveTab, role, setActivePanel }) 
                 }}
               >
                 <Utensils size={18} />
-                <span>Menu</span>
+                <span>Customer Menu</span>
               </button>
             )}
           </React.Fragment>

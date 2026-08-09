@@ -3,11 +3,11 @@ import { AuthContext } from '../../context/AuthContext';
 import { fetchAPI } from '../../utils/api';
 import { Lock, UserCheck, ChefHat, Shield, CreditCard, User } from 'lucide-react';
 
-export const StaffLoginForm = ({ onLoginSuccess, defaultRole = 'chef' }) => {
+export const StaffLoginForm = ({ onLoginSuccess, defaultRole = 'admin' }) => {
   const { login } = useContext(AuthContext);
 
   const [mode, setMode] = useState('login'); // 'login' or 'register'
-  const [selectedRole, setSelectedRole] = useState(defaultRole); // 'chef', 'admin', 'cashier', 'waiter'
+  const [selectedRole, setSelectedRole] = useState(defaultRole); // 'admin', 'cashier', 'chef', 'waiter'
   const [username, setUsername] = useState(defaultRole === 'admin' ? 'admin' : 'chef1');
   const [password, setPassword] = useState(defaultRole === 'admin' ? 'admin123' : 'chef123');
   const [name, setName] = useState('');
@@ -149,9 +149,9 @@ export const StaffLoginForm = ({ onLoginSuccess, defaultRole = 'chef' }) => {
               className="input-field"
               style={{ fontWeight: 700, fontSize: '0.9rem' }}
             >
-              <option value="chef">👨‍🍳 Kitchen Chef</option>
               <option value="admin">📊 Owner / Admin</option>
-              <option value="cashier">💳 Cashier & Billing</option>
+              <option value="cashier">💳 Cashier &amp; Billing</option>
+              <option value="chef">👨‍🍳 Kitchen Chef</option>
               <option value="waiter">🤵 Waiter / Staff</option>
             </select>
           </div>
@@ -242,10 +242,10 @@ export const StaffLoginForm = ({ onLoginSuccess, defaultRole = 'chef' }) => {
               className="input-field"
               style={{ fontWeight: 700 }}
             >
-              <option value="chef">👨‍🍳 Kitchen Chef</option>
-              <option value="cashier">💳 Cashier & Billing</option>
-              <option value="waiter">🤵 Waiter / Staff</option>
               <option value="admin">📊 Sub-Admin</option>
+              <option value="cashier">💳 Cashier &amp; Billing</option>
+              <option value="chef">👨‍🍳 Kitchen Chef</option>
+              <option value="waiter">🤵 Waiter / Staff</option>
             </select>
           </div>
 

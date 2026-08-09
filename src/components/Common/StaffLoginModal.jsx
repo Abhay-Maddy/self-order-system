@@ -40,7 +40,7 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       else if (loggedUser.role === 'chef') targetPanel = 'kitchen';
 
       if (onLoginSuccess) {
-        onLoginSuccess(targetPanel);
+        onLoginSuccess(targetPanel, loggedUser);
       }
       onClose();
     } catch (err) {
@@ -54,9 +54,9 @@ export const StaffLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     setIsSubmitting(true);
     setErrorMsg('');
     try {
-      await login(userDemo, passDemo);
+      const loggedUser = await login(userDemo, passDemo);
       if (onLoginSuccess) {
-        onLoginSuccess(targetPanel);
+        onLoginSuccess(targetPanel, loggedUser);
       }
       onClose();
     } catch (err) {

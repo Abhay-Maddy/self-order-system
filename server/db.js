@@ -76,6 +76,47 @@ export const initDb = async () => {
     await runQuery(`ALTER TABLE users ADD COLUMN is_main_admin INTEGER DEFAULT 0`);
   } catch (e) {}
 
+  // Migration: fix role CHECK constraint to include 'waiter' (SQLite requires table rebuild)
+  // Check if the current constraint already allows 'waiter' by inspecting the table SQL
+  try {
+    const tableInfo = await getQuery(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`);
+    const tableSql = (tableInfo && tableInfo.sql) || '';
+    const needsMigration = tableSql.includes("role IN ('admin', 'cashier', 'chef')") && !tableSql.includes("'waiter'");
+
+    if (needsMigration) {
+      console.log('🔧 Migrating users table to fix role CHECK constraint (adding waiter)...');
+      // SQLite table rebuild to change CHECK constraint
+      await runQuery(`PRAGMA foreign_keys = OFF`);
+      await runQuery(`
+        CREATE TABLE IF NOT EXISTS users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT UNIQUE NOT NULL,
+          email TEXT,
+          personal_email TEXT,
+          phone TEXT,
+          password_hash TEXT NOT NULL,
+          name TEXT NOT NULL,
+          role TEXT CHECK(role IN ('admin', 'cashier', 'chef', 'waiter')) NOT NULL,
+          is_main_admin INTEGER DEFAULT 0,
+          status TEXT CHECK(status IN ('pending', 'approved', 'rejected', 'deactivated')) DEFAULT 'pending',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await runQuery(`
+        INSERT INTO users_new (id, username, email, personal_email, phone, password_hash, name, role, is_main_admin, status, created_at)
+        SELECT id, username, email, personal_email, phone, password_hash, name,
+          CASE WHEN role NOT IN ('admin', 'cashier', 'chef', 'waiter') THEN 'chef' ELSE role END,
+          is_main_admin, status, created_at
+        FROM users
+      `);
+      await runQuery(`DROP TABLE users`);
+      await runQuery(`ALTER TABLE users_new RENAME TO users`);
+      await runQuery(`PRAGMA foreign_keys = ON`);
+      console.log('✅ Users table migration complete — waiter role now allowed.');
+    }
+  } catch (migrationErr) {
+    console.error('⚠️ Role constraint migration error (non-fatal):', migrationErr.message);
+  }
   await runQuery(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

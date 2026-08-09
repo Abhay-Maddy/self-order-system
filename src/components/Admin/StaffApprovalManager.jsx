@@ -15,7 +15,7 @@ export const StaffApprovalManager = () => {
     phone: '',
     name: '',
     password: '',
-    role: 'chef'
+    role: 'admin'
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -24,7 +24,7 @@ export const StaffApprovalManager = () => {
     personal_email: '',
     phone: '',
     username: '',
-    role: 'chef',
+    role: 'admin',
     status: 'approved',
     password: ''
   });
@@ -83,7 +83,7 @@ export const StaffApprovalManager = () => {
         body: JSON.stringify(newUser)
       });
       setSuccessMsg(res.message);
-      setNewUser({ username: '', email: '', personal_email: '', phone: '', name: '', password: '', role: 'chef' });
+      setNewUser({ username: '', email: '', personal_email: '', phone: '', name: '', password: '', role: 'admin' });
       setIsAddUserOpen(false);
       loadStaff();
     } catch (err) {
@@ -99,7 +99,7 @@ export const StaffApprovalManager = () => {
       personal_email: userObj.personal_email || '',
       phone: userObj.phone || '',
       username: userObj.username || '',
-      role: userObj.role || 'chef',
+      role: userObj.role || 'admin',
       status: userObj.status || 'approved',
       password: ''
     });
@@ -247,10 +247,10 @@ export const StaffApprovalManager = () => {
               <div>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>Role:</label>
                 <select value={editFormData.role} onChange={e => setEditFormData({ ...editFormData, role: e.target.value })} className="input-field" disabled={editingUser.is_main_admin === 1}>
-                  <option value="chef">👨‍🍳 Kitchen / Chef</option>
-                  <option value="cashier">💳 Billing / Cashier</option>
-                  <option value="waiter">🤵 Waiter / Floor Staff</option>
                   <option value="admin">📊 Owner / Admin</option>
+                  <option value="cashier">💳 Billing / Cashier</option>
+                  <option value="chef">👨‍🍳 Kitchen / Chef</option>
+                  <option value="waiter">🤵 Waiter / Floor Staff</option>
                 </select>
               </div>
 

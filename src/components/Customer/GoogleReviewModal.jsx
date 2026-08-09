@@ -5,7 +5,7 @@ import { fetchAPI } from '../../utils/api';
 import confetti from 'canvas-confetti';
 import { Star, MapPin, Send, Utensils } from 'lucide-react';
 
-export const GoogleReviewModal = ({ isOpen, onClose, orderId, order, googleReviewUrl }) => {
+export const GoogleReviewModal = ({ isOpen, onClose, onSkip, orderId, order, googleReviewUrl }) => {
   const { t } = useContext(LanguageContext);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -80,7 +80,7 @@ export const GoogleReviewModal = ({ isOpen, onClose, orderId, order, googleRevie
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="⭐ Post-Order Dining & Item Review">
+    <Modal isOpen={isOpen} onClose={onSkip || onClose} title={orderId ? `⭐ Review Your Order #${orderId}` : '⭐ Post-Order Dining & Item Review'}>
       {!submitted ? (
         <div>
           <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
@@ -170,6 +170,15 @@ export const GoogleReviewModal = ({ isOpen, onClose, orderId, order, googleRevie
             <Send size={18} />
             <span>Submit Restaurant & Dish Rating</span>
           </button>
+          {onSkip && (
+            <button
+              onClick={onSkip}
+              className="btn btn-secondary"
+              style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}
+            >
+              Skip for now
+            </button>
+          )}
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '1rem' }}>

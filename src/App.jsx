@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useContext, Component } from 'react';
+import React, { useContext, Component } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { getPanelPath } from './utils/panelPath';
 import { Navbar } from './components/Common/Navbar';
 import { CustomerPanel } from './components/Customer/CustomerPanel';
 import { KitchenPanel } from './components/Kitchen/KitchenPanel';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { WaiterPanel } from './components/Waiter/WaiterPanel';
+import { ProfilePage } from './components/Common/ProfilePage';
 import { StaffLoginView } from './components/Common/StaffLoginView';
 import { BellAlert } from './components/Common/BellAlert';
 import { ThemeProvider } from './context/ThemeContext';
@@ -11,7 +14,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { safeStorage, safeSessionStorage } from './utils/storage';
-import { Utensils, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Utensils, RefreshCw } from 'lucide-react';
 
 // Error Boundary to prevent blank white screen crashes
 class ErrorBoundary extends Component {
@@ -40,7 +43,7 @@ class ErrorBoundary extends Component {
           safeSessionStorage.clear();
         } catch (e) { }
         this.setState({ hasError: false, error: null });
-        window.location.reload();
+        window.location.href = '/';
       };
 
       return (
@@ -93,50 +96,55 @@ class ErrorBoundary extends Component {
   }
 }
 
-const getPanelForUserRole = (u) => {
-  if (!u) return 'customer';
-  const role = typeof u === 'string' ? u : (u.role || '');
-  const username = typeof u === 'object' ? (u.username || '') : '';
-  const name = typeof u === 'object' ? (u.name || '') : '';
+// Re-export so other modules can import from App (kept for backwards compat)
+export { getPanelPath };
 
-  if (role === 'waiter' || username === 'waiter1' || name.toLowerCase().includes('waiter')) return 'waiter';
-  if (role === 'chef' || username === 'chef1' || name.toLowerCase().includes('chef')) return 'kitchen';
-  if (['admin', 'cashier'].includes(role)) return 'admin';
-  return 'customer';
-};
+// Guard: redirect staff-only routes if not logged in / wrong role
+function RequireAuth({ allowedRoles, children }) {
+  const { user, loading } = useContext(AuthContext);
+  const location = useLocation();
+
+  if (loading) return null; // wait for auth check
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Wrong role — send them to their own panel
+    return <Navigate to={getPanelPath(user)} replace />;
+  }
+
+  return children;
+}
+
+// After login, if user visits /login again, redirect to their panel
+function LoginRoute() {
+  const { user, loading } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  if (loading) return null;
+
+  if (user) {
+    return <Navigate to={getPanelPath(user)} replace />;
+  }
+
+  return (
+    <StaffLoginView
+      onLoginSuccess={(targetPanel, loggedUser) => {
+        // loggedUser is passed from StaffLoginView after successful login
+        if (loggedUser) {
+          navigate(getPanelPath(loggedUser));
+        }
+      }}
+    />
+  );
+}
 
 function AppContent() {
-  const [activePanel, setActivePanelState] = useState('customer');
   const { user, loading } = useContext(AuthContext);
-  const isInitialLoad = React.useRef(true);
-
-  const setActivePanel = (panel) => {
-    setActivePanelState(panel);
-  };
-
-  useEffect(() => {
-    if (!loading) {
-      if (user) {
-        const isWaiter = user.role === 'waiter' || user.username === 'waiter1' || (user.name && user.name.toLowerCase().includes('waiter'));
-        const isChef = user.role === 'chef' || user.username === 'chef1' || (user.name && user.name.toLowerCase().includes('chef'));
-
-        if (isInitialLoad.current || activePanel === 'staff-login') {
-          setActivePanelState(getPanelForUserRole(user));
-          isInitialLoad.current = false;
-        } else if (isWaiter && activePanel === 'admin') {
-          setActivePanelState('waiter');
-        } else if (isChef && activePanel === 'admin') {
-          setActivePanelState('kitchen');
-        }
-      } else {
-        if (isInitialLoad.current) {
-          isInitialLoad.current = false;
-        } else if (['admin', 'kitchen', 'waiter'].includes(activePanel)) {
-          setActivePanelState('customer');
-        }
-      }
-    }
-  }, [user, loading, activePanel]);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -163,19 +171,153 @@ function AppContent() {
     );
   }
 
+  // setActivePanel-compatible helper for legacy child components that still call it
+  const setActivePanel = (panel) => {
+    if (panel === 'customer') { navigate('/'); return; }
+    if (panel === 'staff-login') { navigate('/login'); return; }
+    if (user) {
+      const name = encodeURIComponent((user.name || user.username || 'user').toLowerCase().replace(/\s+/g, '-'));
+      if (panel === 'admin' || panel === 'cashier') { navigate(`/admin/${name}`); return; }
+      if (panel === 'kitchen') { navigate(`/kitchen/${name}`); return; }
+      if (panel === 'waiter') { navigate(`/waiter/${name}`); return; }
+      // customer-menu from a logged-in role context
+      if (panel === 'customer-menu') {
+        if (user.role === 'waiter') { navigate(`/waiter/${name}/customer-menu`); return; }
+        if (user.role === 'chef') { navigate('/'); return; }
+        navigate(`/admin/${name}/customer-menu`); return;
+      }
+    }
+    navigate('/');
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar activePanel={activePanel} setActivePanel={setActivePanel} />
+      <Navbar setActivePanel={setActivePanel} />
       <BellAlert />
 
       <main style={{ flex: 1 }}>
-        {activePanel === 'customer' && <CustomerPanel setActivePanel={setActivePanel} />}
-        {activePanel === 'kitchen' && <KitchenPanel setActivePanel={setActivePanel} />}
-        {activePanel === 'waiter' && <WaiterPanel setActivePanel={setActivePanel} />}
-        {activePanel === 'admin' && <AdminPanel setActivePanel={setActivePanel} />}
-        {activePanel === 'staff-login' && !user && (
-          <StaffLoginView onLoginSuccess={(target) => setActivePanel(target)} />
-        )}
+        <Routes>
+          {/* Public: Home / Customer menu */}
+          <Route path="/" element={<CustomerPanel setActivePanel={setActivePanel} />} />
+          <Route path="/menu" element={<CustomerPanel setActivePanel={setActivePanel} />} />
+          <Route path="/menu/:tableNumber" element={<CustomerPanel setActivePanel={setActivePanel} />} />
+
+          {/* Login */}
+          <Route path="/login" element={<LoginRoute />} />
+
+          {/* Profile page (all logged-in staff) */}
+          <Route path="/profile" element={<ProfilePage />} />
+
+          {/* Admin routes (admin + cashier can access) */}
+          <Route
+            path="/admin/:name"
+            element={
+              <RequireAuth allowedRoles={['admin', 'cashier']}>
+                <AdminPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/:name/:tab"
+            element={
+              <RequireAuth allowedRoles={['admin', 'cashier']}>
+                <AdminPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          {/* Admin browsing customer menu */}
+          <Route
+            path="/admin/:name/customer-menu"
+            element={
+              <RequireAuth allowedRoles={['admin', 'cashier']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/:name/customer-menu/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['admin', 'cashier']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+
+          {/* Cashier (uses Admin panel) */}
+          <Route
+            path="/cashier/:name"
+            element={
+              <RequireAuth allowedRoles={['cashier', 'admin']}>
+                <AdminPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/cashier/:name/:tab"
+            element={
+              <RequireAuth allowedRoles={['cashier', 'admin']}>
+                <AdminPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          {/* Cashier browsing customer menu */}
+          <Route
+            path="/cashier/:name/customer-menu"
+            element={
+              <RequireAuth allowedRoles={['cashier', 'admin']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/cashier/:name/customer-menu/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['cashier', 'admin']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+
+          {/* Kitchen */}
+          <Route
+            path="/kitchen/:name"
+            element={
+              <RequireAuth allowedRoles={['chef']}>
+                <KitchenPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+
+          {/* Waiter */}
+          <Route
+            path="/waiter/:name"
+            element={
+              <RequireAuth allowedRoles={['waiter']}>
+                <WaiterPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          {/* Waiter browsing customer menu */}
+          <Route
+            path="/waiter/:name/customer-menu"
+            element={
+              <RequireAuth allowedRoles={['waiter']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/waiter/:name/customer-menu/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['waiter']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       <footer style={{

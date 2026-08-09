@@ -86,7 +86,19 @@ router.get('/me', verifyToken, async (req, res) => {
 // Admin: List all users (Admins, Chefs, Cashiers, Waiters)
 router.get('/staff', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const staff = await allQuery('SELECT id, username, email, personal_email, phone, name, role, is_main_admin, status, created_at FROM users ORDER BY created_at DESC');
+    const staff = await allQuery(`
+      SELECT id, username, email, personal_email, phone, name, role, is_main_admin, status, created_at 
+      FROM users 
+      ORDER BY 
+        CASE role 
+          WHEN 'admin' THEN 1 
+          WHEN 'cashier' THEN 2 
+          WHEN 'chef' THEN 3 
+          WHEN 'waiter' THEN 4 
+          ELSE 5 
+        END ASC,
+        created_at DESC
+    `);
     res.json(staff);
   } catch (err) {
     res.status(500).json({ error: err.message });

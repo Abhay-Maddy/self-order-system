@@ -8,7 +8,7 @@ export const CategoryTabs = ({ categories, activeCategory, setActiveCategory, ac
   return (
     <div style={{ marginBottom: '1.5rem' }}>
       {/* Category Tabs */}
-      <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+      <div className="category-tabs-wrapper" style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.5rem', scrollbarWidth: 'none' }}>
         <button
           onClick={() => { setActiveCategory('all'); setActiveSubcat('all'); }}
           className={`btn ${activeCategory === 'all' ? 'btn-primary' : 'btn-secondary'}`}

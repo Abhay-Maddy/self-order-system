@@ -1,4 +1,5 @@
-import React, { useState, useContext } from 'react';
+import React, { useContext } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
 import { DashboardOverview } from './DashboardOverview';
 import { BillingView } from './BillingView';
@@ -18,11 +19,60 @@ import { AuthContext } from '../../context/AuthContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { Menu, X, ChevronRight } from 'lucide-react';
 
+// Map URL tab slug → component tab key
+const TAB_SLUG_MAP = {
+  overview:   'overview',
+  invoice:    'billing',
+  invoices:   'billing',
+  billing:    'billing',
+  refunds:    'refunds',
+  menu:       'menu',
+  table:      'tables',
+  tables:     'tables',
+  staff:      'staff',
+  inventory:  'inventory',
+  coupons:    'coupons',
+  customers:  'customers',
+  reviews:    'item_reviews',
+  reports:    'reports',
+  settings:   'settings',
+  edit:       'settings',
+};
+
 export const AdminPanel = ({ setActivePanel }) => {
   const { user } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const { name, tab } = useParams();
+  const navigate = useNavigate();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = React.useState(false);
   const isMobile = useIsMobile(768);
+
+  // Resolve active tab from URL slug (default to 'overview')
+  const activeTab = TAB_SLUG_MAP[tab] || 'overview';
+
+  const basePath = user
+    ? (user.role === 'cashier' ? `/cashier/${name}` : `/admin/${name}`)
+    : `/admin/${name}`;
+
+  const setActiveTab = (tabKey) => {
+    // Map internal key → URL slug
+    const slugMap = {
+      overview:    'overview',
+      billing:     'invoice',
+      refunds:     'refunds',
+      menu:        'menu',
+      tables:      'table',
+      staff:       'staff',
+      inventory:   'inventory',
+      coupons:     'coupons',
+      customers:   'customers',
+      item_reviews:'reviews',
+      reports:     'reports',
+      settings:    'settings',
+    };
+    const slug = slugMap[tabKey] || tabKey;
+    navigate(`${basePath}/${slug}`);
+    setMobileDrawerOpen(false);
+  };
 
   if (!user || !['admin', 'cashier'].includes(user.role)) {
     if (user && user.role === 'waiter') {
@@ -33,7 +83,12 @@ export const AdminPanel = ({ setActivePanel }) => {
       if (setActivePanel) setActivePanel('kitchen');
       return null;
     }
-    return <StaffLoginView defaultRole="admin" onLoginSuccess={(target) => setActivePanel && setActivePanel(target)} />;
+    return <StaffLoginView defaultRole="admin" onLoginSuccess={(target, loggedUser) => {
+      if (loggedUser) {
+        const encodedName = encodeURIComponent((loggedUser.name || loggedUser.username || 'user').toLowerCase().replace(/\s+/g, '-'));
+        navigate(loggedUser.role === 'cashier' ? `/cashier/${encodedName}` : `/admin/${encodedName}`);
+      }
+    }} />;
   }
 
   const navLabels = {
@@ -71,30 +126,32 @@ export const AdminPanel = ({ setActivePanel }) => {
   };
 
   return (
-    <div className="container" style={{ padding: isMobile ? '0.75rem 0.4rem 4rem' : '1rem 0.5rem 4rem', maxWidth: '100%' }}>
+    <div style={{ padding: isMobile ? '0.5rem 0.25rem 4rem' : '1rem 0.5rem 4rem', maxWidth: '100%' }}>
       {/* Mobile Drawer Trigger Header Bar */}
       {isMobile && (
-        <div style={{ marginBottom: '0.85rem' }}>
+        <div style={{ marginBottom: '0.6rem' }}>
           <button
             type="button"
             onClick={() => setMobileDrawerOpen(true)}
             className="btn btn-secondary"
             style={{
               width: '100%',
-              justify: 'space-between',
-              padding: '0.65rem 0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.5rem 0.75rem',
               borderRadius: '10px',
               border: '1px solid var(--brand-primary)',
               color: 'var(--brand-primary)',
               fontWeight: 800,
-              fontSize: '0.9rem'
+              fontSize: '0.85rem'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Menu size={18} />
-              <span>Admin Menu: {navLabels[activeTab] || 'Overview'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <Menu size={16} />
+              <span>{navLabels[activeTab] || 'Overview'}</span>
             </div>
-            <ChevronRight size={18} />
+            <ChevronRight size={16} />
           </button>
         </div>
       )}
@@ -141,10 +198,7 @@ export const AdminPanel = ({ setActivePanel }) => {
 
             <AdminSidebar
               activeTab={activeTab}
-              setActiveTab={(tab) => {
-                setActiveTab(tab);
-                setMobileDrawerOpen(false);
-              }}
+              setActiveTab={setActiveTab}
               role={user.role}
               setActivePanel={setActivePanel}
             />
