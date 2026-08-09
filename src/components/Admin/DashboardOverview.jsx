@@ -483,7 +483,7 @@ export const DashboardOverview = ({ setActivePanel }) => {
                     title="Select All Orders"
                   />
                 </th>
-                <th style={{ padding: '0.45rem 0.4rem', width: '150px' }}>Order # &amp; Details</th>
+                <th style={{ padding: '0.45rem 0.4rem', width: '150px' }}>Order & Details</th>
                 <th style={{ padding: '0.45rem 0.4rem', width: '180px' }}>Dishes Breakdown</th>
                 <th style={{ padding: '0.45rem 0.4rem', width: '75px' }}>Amount</th>
                 <th style={{ padding: '0.45rem 0.4rem', width: '85px' }}>Payment Mode</th>
