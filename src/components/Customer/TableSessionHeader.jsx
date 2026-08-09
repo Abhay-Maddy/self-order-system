@@ -21,7 +21,8 @@ export const TableSessionHeader = ({
   onOpenOrderTracker,
   onOpenHistory,
   onOpenBillInvoice,
-  setActivePanel
+  setActivePanel,
+  onOpenOrderSelectModal
 }) => {
   const { t } = useContext(LanguageContext);
   const { user } = useContext(AuthContext);
@@ -42,9 +43,13 @@ export const TableSessionHeader = ({
       {/* Top Header Bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
 
-        {/* QR Code Scanned Table Badge Chip (Only shown when accessed via QR code parameter) */}
-        {hasTableParam && (
-          <div style={{
+        {/* Interactive Mode & Table Badge Chip */}
+        <div
+          onClick={() => {
+            if (onOpenOrderSelectModal) onOpenOrderSelectModal();
+            else if (user) setIsTableSelectorOpen(!isTableSelectorOpen);
+          }}
+          style={{
             background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)',
             color: '#fff',
             padding: '0.45rem 0.85rem',
@@ -55,12 +60,29 @@ export const TableSessionHeader = ({
             fontWeight: 800,
             fontSize: '0.85rem',
             boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
-            whiteSpace: 'nowrap'
-          }}>
-            <QrCode size={16} />
-            <span>Table #{selectedTable}</span>
-          </div>
-        )}
+            whiteSpace: 'nowrap',
+            cursor: (user || onOpenOrderSelectModal) ? 'pointer' : 'default'
+          }}
+          title={user ? "Click to change Order Mode or Table Number" : `Ordering Mode: ${orderFor}`}
+        >
+          {orderFor === 'self' || selectedTable === 'None' ? (
+            <>
+              <span>🙋</span>
+              <span>Self Menu</span>
+            </>
+          ) : orderFor === 'qr' ? (
+            <>
+              <QrCode size={16} />
+              <span>QR Table #{selectedTable}</span>
+            </>
+          ) : (
+            <>
+              <QrCode size={16} />
+              <span>Table #{selectedTable}</span>
+            </>
+          )}
+          {user && <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>⚙️</span>}
+        </div>
 
         {/* Back to Dashboard Button — role-aware */}
         {user && setActivePanel && (() => {

@@ -69,6 +69,23 @@ router.post('/', verifyToken, requireRole(['admin']), async (req, res) => {
   }
 });
 
+router.put('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { code, discount_type, discount_value, min_order_amount, usage_limit } = req.body;
+    if (!code) return res.status(400).json({ error: 'Coupon code is required.' });
+
+    await runQuery(`
+      UPDATE coupons 
+      SET code = ?, discount_type = ?, discount_value = ?, min_order_amount = ?, usage_limit = ?
+      WHERE id = ?
+    `, [code.toUpperCase(), discount_type, discount_value, min_order_amount || 0, usage_limit || 100, req.params.id]);
+
+    res.json({ message: 'Coupon updated successfully!' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     await runQuery('DELETE FROM coupons WHERE id = ?', [req.params.id]);

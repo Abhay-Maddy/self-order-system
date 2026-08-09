@@ -49,56 +49,49 @@ export const CustomerPanel = ({ setActivePanel }) => {
   const [pendingReviewData, setPendingReviewData] = useState(null);
   const [showPendingReview, setShowPendingReview] = useState(false);
 
-  // Determine initial table: URL param takes priority, then ?table= query param
-  const getInitialTable = () => {
-    if (urlTableNumber) return urlTableNumber.toUpperCase();
+  // Helper to parse mode and table from URL path
+  const getInitialModeAndTable = () => {
+    const path = window.location.pathname;
+    const parts = path.split('/').filter(Boolean);
+    
+    if (path.includes('/self/menu')) {
+      return { mode: 'self', table: 'None' };
+    }
+    const custIdx = parts.indexOf('customer');
+    if (custIdx !== -1 && parts[custIdx + 1] && parts[custIdx + 1] !== 'menu') {
+      return { mode: 'customer', table: parts[custIdx + 1].toUpperCase() };
+    }
+    const qrIdx = parts.indexOf('qr');
+    if (qrIdx !== -1 && parts[qrIdx + 1]) {
+      return { mode: 'qr', table: parts[qrIdx + 1].toUpperCase() };
+    }
+    if (urlTableNumber) {
+      return { mode: 'customer', table: urlTableNumber.toUpperCase() };
+    }
     const qParam = new URLSearchParams(window.location.search).get('table');
-    if (qParam) return qParam.toUpperCase();
-    return 'T-01';
+    if (qParam) {
+      return { mode: 'qr', table: qParam.toUpperCase() };
+    }
+    return { mode: 'customer', table: 'T-01' };
   };
 
-  const [selectedTable, setSelectedTable] = useState(getInitialTable);
-  const [orderFor, setOrderFor] = useState('customer'); // 'self' or 'customer'
+  const initialParsed = getInitialModeAndTable();
+  const [selectedTable, setSelectedTable] = useState(initialParsed.table);
+  const [orderFor, setOrderFor] = useState(initialParsed.mode); // 'self', 'customer', 'qr'
 
-  // Check if table parameter is present in URL (either path param or query param)
-  const hasTableParam = Boolean(urlTableNumber) || Boolean(new URLSearchParams(window.location.search).get('table'));
+  // Check if table parameter is present in URL
+  const hasTableParam = Boolean(urlTableNumber) || Boolean(new URLSearchParams(window.location.search).get('table')) || location.pathname.includes('/customer/') || location.pathname.includes('/qr/') || location.pathname.includes('/self/');
 
-  // "Who is ordering?" modal — ONLY shown to logged-in users, and only once per login session
-  // Skipped automatically when:
-  //   (a) user is NOT logged in (non-staff guest customers go straight to menu)
-  //   (b) table is already set via QR param (?table=T-01)
-  //   (c) already selected in this session
   const [showOrderSelectModal, setShowOrderSelectModal] = useState(false);
-  const [modalOrderFor, setModalOrderFor] = useState('customer');
-  const [modalTable, setModalTable] = useState('T-01');
-
-  // Rejection notifications for customer (when kitchen rejects their item)
-  const [rejectionToasts, setRejectionToasts] = useState([]);
-
-  const [activeCategory, setActiveCategory] = useState('all');
-  const [activeSubcat, setActiveSubcat] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [vegOnly, setVegOnly] = useState(false);
-
-  const [selectedItemForModal, setSelectedItemForModal] = useState(null);
-  const [cart, setCart] = useState([]);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-
-  const [activeOrder, setActiveOrder] = useState(null);
-  const [isOrderTrackerOpen, setIsOrderTrackerOpen] = useState(false);
-  const [isRatingOpen, setIsRatingOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isCustomerBillOpen, setIsCustomerBillOpen] = useState(false);
-  const [tamperAlert, setTamperAlert] = useState(false);
+  const [modalOrderFor, setModalOrderFor] = useState(initialParsed.mode);
+  const [modalTable, setModalTable] = useState(initialParsed.table === 'None' ? 'T-01' : initialParsed.table);
 
   // Parse query param / URL path table with anti-tamper session security
   useEffect(() => {
-    if (urlTableNumber) {
-      // From URL path param /menu/T-01 — set table directly (anti-tamper still applies)
-      const cleanTable = urlTableNumber.toUpperCase();
+    const parsed = getInitialModeAndTable();
+    setOrderFor(parsed.mode);
+    if (parsed.table !== 'None') {
+      const cleanTable = parsed.table.toUpperCase();
       const storedScannedTable = safeSessionStorage.getItem('scanned_table_qr');
       if (!storedScannedTable) {
         safeSessionStorage.setItem('scanned_table_qr', cleanTable);
@@ -110,24 +103,41 @@ export const CustomerPanel = ({ setActivePanel }) => {
         setSelectedTable(cleanTable);
       }
     } else {
-      // Legacy: ?table= query param
-      const params = new URLSearchParams(window.location.search);
-      const tableParam = params.get('table');
-      if (tableParam) {
-        const cleanTable = tableParam.toUpperCase();
-        const storedScannedTable = safeSessionStorage.getItem('scanned_table_qr');
-        if (!storedScannedTable) {
-          safeSessionStorage.setItem('scanned_table_qr', cleanTable);
-          setSelectedTable(cleanTable);
-        } else if (storedScannedTable !== cleanTable) {
-          setTamperAlert(true);
-          setSelectedTable(storedScannedTable);
-        } else {
-          setSelectedTable(cleanTable);
-        }
-      }
+      setSelectedTable('None');
     }
-  }, [urlTableNumber]);
+  }, [location.pathname, urlTableNumber]);
+
+  // Show "Who is Ordering?" modal for logged-in staff when on generic customer-menu path
+  useEffect(() => {
+    if (user && location.pathname.endsWith('/customer-menu')) {
+      setShowOrderSelectModal(true);
+    }
+  }, [user, location.pathname]);
+
+  // Helper: build the correct URL for "Continue to Menu" based on current path context
+  const buildMenuUrl = (table, mode, pathContext) => {
+    const path = pathContext || location.pathname;
+    const parts = path.split('/').filter(Boolean); // e.g. ['admin', 'abhay', 'customer-menu']
+    const effectiveMode = mode || modalOrderFor || orderFor;
+    const effectiveTable = table || selectedTable || 'T-01';
+
+    const staffRole = parts[0] && ['admin', 'cashier', 'waiter'].includes(parts[0]) ? parts[0] : (user && ['admin', 'cashier', 'waiter'].includes(user.role) ? user.role : null);
+    const staffName = parts[1] || (user ? encodeURIComponent((user.name || user.username || 'staff').toLowerCase().replace(/\s+/g, '-')) : 'user');
+
+    if (staffRole) {
+      if (effectiveMode === 'self' || effectiveTable === 'None') {
+        return `/${staffRole}/${staffName}/self/menu`;
+      }
+      if (effectiveMode === 'qr') {
+        return `/${staffRole}/${staffName}/qr/${effectiveTable}`;
+      }
+      return `/${staffRole}/${staffName}/customer/${effectiveTable}`;
+    }
+
+    if (effectiveMode === 'self' || effectiveTable === 'None') return '/menu';
+    if (effectiveMode === 'qr') return `/qr/${effectiveTable}`;
+    return `/customer/${effectiveTable}`;
+  };
 
   // Fetch Menu and Tables
   useEffect(() => {
@@ -509,52 +519,72 @@ export const CustomerPanel = ({ setActivePanel }) => {
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Please select how you'd like to order</p>
             </div>
 
-            {/* Self / Customer Buttons */}
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            {/* Self / Customer / QR Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
               <button
+                type="button"
                 onClick={() => { setModalOrderFor('self'); setModalTable('None'); }}
                 style={{
-                  flex: 1,
-                  padding: '1rem 0.5rem',
-                  borderRadius: '14px',
+                  padding: '0.85rem 0.3rem',
+                  borderRadius: '12px',
                   border: `2px solid ${modalOrderFor === 'self' ? 'var(--brand-primary)' : 'var(--border-color)'}`,
                   background: modalOrderFor === 'self' ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface-elevated)',
                   color: 'var(--text-primary)',
                   cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem',
                   transition: 'all 0.2s ease',
                   fontWeight: 700
                 }}
               >
-                <span style={{ fontSize: '1.75rem' }}>🙋</span>
-                <span style={{ fontSize: '0.9rem' }}>Self</span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>Ordering for yourself</span>
-                {modalOrderFor === 'self' && <CheckCircle size={16} color="var(--brand-primary)" />}
+                <span style={{ fontSize: '1.4rem' }}>🙋</span>
+                <span style={{ fontSize: '0.82rem' }}>Self</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>Takeaway</span>
+                {modalOrderFor === 'self' && <CheckCircle size={14} color="var(--brand-primary)" />}
               </button>
               <button
+                type="button"
                 onClick={() => { setModalOrderFor('customer'); if (modalTable === 'None') setModalTable('T-01'); }}
                 style={{
-                  flex: 1,
-                  padding: '1rem 0.5rem',
-                  borderRadius: '14px',
+                  padding: '0.85rem 0.3rem',
+                  borderRadius: '12px',
                   border: `2px solid ${modalOrderFor === 'customer' ? 'var(--brand-primary)' : 'var(--border-color)'}`,
                   background: modalOrderFor === 'customer' ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface-elevated)',
                   color: 'var(--text-primary)',
                   cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem',
                   transition: 'all 0.2s ease',
                   fontWeight: 700
                 }}
               >
-                <span style={{ fontSize: '1.75rem' }}>👥</span>
-                <span style={{ fontSize: '0.9rem' }}>Customer</span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>Order for a table</span>
-                {modalOrderFor === 'customer' && <CheckCircle size={16} color="var(--brand-primary)" />}
+                <span style={{ fontSize: '1.4rem' }}>👥</span>
+                <span style={{ fontSize: '0.82rem' }}>Customer</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>Table Order</span>
+                {modalOrderFor === 'customer' && <CheckCircle size={14} color="var(--brand-primary)" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setModalOrderFor('qr'); if (modalTable === 'None') setModalTable('T-01'); }}
+                style={{
+                  padding: '0.85rem 0.3rem',
+                  borderRadius: '12px',
+                  border: `2px solid ${modalOrderFor === 'qr' ? 'var(--brand-primary)' : 'var(--border-color)'}`,
+                  background: modalOrderFor === 'qr' ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface-elevated)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem',
+                  transition: 'all 0.2s ease',
+                  fontWeight: 700
+                }}
+              >
+                <span style={{ fontSize: '1.4rem' }}>📱</span>
+                <span style={{ fontSize: '0.82rem' }}>QR Scan</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>QR Menu</span>
+                {modalOrderFor === 'qr' && <CheckCircle size={14} color="var(--brand-primary)" />}
               </button>
             </div>
 
-            {/* Table selector — shown only when Customer is chosen */}
-            {modalOrderFor === 'customer' && (
+            {/* Table selector — shown when Customer or QR is chosen */}
+            {(modalOrderFor === 'customer' || modalOrderFor === 'qr') && (
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
                   Select Table Number
@@ -598,8 +628,8 @@ export const CustomerPanel = ({ setActivePanel }) => {
                 setSelectedTable(newTable);
                 sessionStorage.setItem('aamantran_order_mode_set', 'true');
                 setShowOrderSelectModal(false);
-                // Update URL to reflect the selected table
-                const menuUrl = buildMenuUrl(newTable, location.pathname);
+                // Update URL to reflect the selected table & mode
+                const menuUrl = buildMenuUrl(newTable, modalOrderFor, location.pathname);
                 navigate(menuUrl, { replace: true });
               }}
               className="btn btn-primary btn-lg"
@@ -672,6 +702,7 @@ export const CustomerPanel = ({ setActivePanel }) => {
             }
           }}
           setActivePanel={setActivePanel}
+          onOpenOrderSelectModal={() => setShowOrderSelectModal(true)}
         />
 
         {/* Inline Active Order Status Bar — Top of Menu Section */}

@@ -625,9 +625,14 @@ export const DashboardOverview = ({ setActivePanel }) => {
                       )}
                     </td>
 
-                    {/* Amount */}
-                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 800, color: 'var(--brand-primary)', whiteSpace: 'nowrap', width: '75px' }}>
-                      {formatCurrency(ord.net_amount)}
+                    {/* Amount & Customer Phone */}
+                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 800, color: 'var(--brand-primary)', whiteSpace: 'nowrap', width: '90px' }}>
+                      <div>{formatCurrency(ord.net_amount)}</div>
+                      {ord.customer_phone && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <span>📞</span> {ord.customer_phone}
+                        </div>
+                      )}
                     </td>
 
                     {/* Payment Mode (ONLY Mode written) */}

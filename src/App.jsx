@@ -197,10 +197,12 @@ function AppContent() {
 
       <main style={{ flex: 1 }}>
         <Routes>
-          {/* Public: Home / Customer menu */}
+          {/* Public: Home / Customer menu / QR */}
           <Route path="/" element={<CustomerPanel setActivePanel={setActivePanel} />} />
           <Route path="/menu" element={<CustomerPanel setActivePanel={setActivePanel} />} />
           <Route path="/menu/:tableNumber" element={<CustomerPanel setActivePanel={setActivePanel} />} />
+          <Route path="/customer/:tableNumber" element={<CustomerPanel setActivePanel={setActivePanel} />} />
+          <Route path="/qr/:tableNumber" element={<CustomerPanel setActivePanel={setActivePanel} />} />
 
           {/* Login */}
           <Route path="/login" element={<LoginRoute />} />
@@ -242,6 +244,30 @@ function AppContent() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/admin/:name/self/menu"
+            element={
+              <RequireAuth allowedRoles={['admin', 'cashier']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/:name/customer/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['admin', 'cashier']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/:name/qr/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['admin', 'cashier']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
 
           {/* Cashier (uses Admin panel) */}
           <Route
@@ -271,6 +297,30 @@ function AppContent() {
           />
           <Route
             path="/cashier/:name/customer-menu/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['cashier', 'admin']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/cashier/:name/self/menu"
+            element={
+              <RequireAuth allowedRoles={['cashier', 'admin']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/cashier/:name/customer/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['cashier', 'admin']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/cashier/:name/qr/:tableNumber"
             element={
               <RequireAuth allowedRoles={['cashier', 'admin']}>
                 <CustomerPanel setActivePanel={setActivePanel} />
@@ -308,6 +358,30 @@ function AppContent() {
           />
           <Route
             path="/waiter/:name/customer-menu/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['waiter']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/waiter/:name/self/menu"
+            element={
+              <RequireAuth allowedRoles={['waiter']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/waiter/:name/customer/:tableNumber"
+            element={
+              <RequireAuth allowedRoles={['waiter']}>
+                <CustomerPanel setActivePanel={setActivePanel} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/waiter/:name/qr/:tableNumber"
             element={
               <RequireAuth allowedRoles={['waiter']}>
                 <CustomerPanel setActivePanel={setActivePanel} />
