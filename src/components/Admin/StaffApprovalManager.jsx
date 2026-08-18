@@ -283,7 +283,7 @@ export const StaffApprovalManager = () => {
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
               <th style={{ padding: '0.75rem' }}>Name & Emails</th>
-              <th style={{ padding: '0.75rem' }}>Phone & Username</th>
+              <th style={{ padding: '0.75rem' }}>Username & Phone</th>
               <th style={{ padding: '0.75rem' }}>Role</th>
               <th style={{ padding: '0.75rem' }}>Status</th>
               <th style={{ padding: '0.75rem', textAlign: 'right' }}>Actions</th>

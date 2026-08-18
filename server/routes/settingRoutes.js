@@ -35,7 +35,13 @@ router.put('/', verifyToken, requireRole(['admin']), async (req, res) => {
       WHERE id = (SELECT id FROM restaurant_settings LIMIT 1)
     `, [name, address, phone, gstin, tax_rate, currency, default_lang, google_maps_review_url]);
 
-    res.json({ message: 'Restaurant settings updated successfully' });
+    const updated = await getQuery('SELECT * FROM restaurant_settings LIMIT 1');
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('settings_updated', updated);
+    }
+
+    res.json({ message: 'Restaurant settings updated successfully', settings: updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

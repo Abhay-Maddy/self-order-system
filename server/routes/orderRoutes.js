@@ -367,6 +367,29 @@ router.patch('/items/:itemId/status', verifyToken, requireRole(['chef', 'admin',
   }
 });
 
+// Admin / Cashier / Waiter: Update table number for an order (e.g. Assign table to Takeaway order)
+router.patch('/:id/table', verifyToken, requireRole(['admin', 'cashier', 'waiter']), async (req, res) => {
+  try {
+    const { table_number } = req.body;
+    if (!table_number) return res.status(400).json({ error: 'Table number is required.' });
+
+    await runQuery('UPDATE orders SET table_number = ? WHERE id = ?', [table_number.toUpperCase(), req.params.id]);
+    const updatedOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    const items = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [req.params.id]);
+
+    const complete = { ...updatedOrder, items };
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admin').emit('order_updated', complete);
+      io.to('kitchen').emit('order_updated', complete);
+    }
+
+    res.json(complete);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin / Cashier: Update full order status or payment status (e.g. Settle / Complete / Cancel / Refund)
 router.patch('/:id/status', verifyToken, requireRole(['admin', 'cashier']), async (req, res) => {
   try {

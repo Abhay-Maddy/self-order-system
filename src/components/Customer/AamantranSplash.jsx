@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { QrCode, Sparkles, UtensilsCrossed, ShieldCheck } from 'lucide-react';
+import { SettingsContext } from '../../context/SettingsContext';
 
 export const AamantranSplash = ({ tableNumber, onComplete }) => {
+  const { settings } = useContext(SettingsContext) || {};
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
@@ -106,7 +108,7 @@ export const AamantranSplash = ({ tableNumber, onComplete }) => {
         />
       </div>
 
-      {/* Branding Name Reveal: AAMANTRAN */}
+      {/* Branding Name Reveal */}
       <h1
         style={{
           fontFamily: "'Outfit', sans-serif",
@@ -120,7 +122,7 @@ export const AamantranSplash = ({ tableNumber, onComplete }) => {
           textShadow: '0 4px 20px rgba(245, 158, 11, 0.3)'
         }}
       >
-        AAMANTRAN
+        {(settings?.name || 'AAMANTRAN').toUpperCase()}
       </h1>
 
       <p style={{ fontSize: '0.95rem', color: '#cbd5e1', fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '1.5rem' }}>

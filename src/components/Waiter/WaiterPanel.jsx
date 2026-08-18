@@ -300,7 +300,13 @@ export const WaiterPanel = ({ setActivePanel }) => {
                   <td style={{ padding: '0.55rem 0.6rem', verticalAlign: 'top' }}>
                     <div style={{ fontWeight: 800, fontSize: '0.83rem', color: 'var(--brand-primary)' }}>#{ord.order_number}</div>
                     <div style={{ marginTop: '3px' }}>
-                      <span className="badge badge-dinein" style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.1rem 0.35rem' }}>Table #{ord.table_number}</span>
+                      {ord.table_number === 'Takeaway' || ord.table_number === 'None' || !ord.table_number ? (
+                        <span className="badge badge-warning" style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.1rem 0.35rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+                          🛍️ TAKEAWAY
+                        </span>
+                      ) : (
+                        <span className="badge badge-dinein" style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.1rem 0.35rem' }}>Table #{ord.table_number}</span>
+                      )}
                     </div>
                   </td>
 

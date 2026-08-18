@@ -54,6 +54,25 @@ export const DashboardOverview = ({ setActivePanel }) => {
       .finally(() => setLoadingOrders(false));
   };
 
+  // Inline Table Editor State (No window.prompt browser pop-ups)
+  const [editingTableOrderId, setEditingTableOrderId] = useState(null);
+  const [customTableInput, setCustomTableInput] = useState('');
+
+  const handleSaveTableNumber = async (orderId, newTableNum) => {
+    if (!newTableNum || !newTableNum.trim()) return;
+    try {
+      const updated = await fetchAPI(`/orders/${orderId}/table`, {
+        method: 'PATCH',
+        body: JSON.stringify({ table_number: newTableNum.trim().toUpperCase() })
+      });
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, table_number: updated.table_number || newTableNum.trim().toUpperCase() } : o));
+      setEditingTableOrderId(null);
+      setCustomTableInput('');
+    } catch (err) {
+      alert(err.message || 'Failed to update table number');
+    }
+  };
+
   useEffect(() => {
     joinRoom('admin');
   }, [socket, connected]);
@@ -483,7 +502,8 @@ export const DashboardOverview = ({ setActivePanel }) => {
                     title="Select All Orders"
                   />
                 </th>
-                <th style={{ padding: '0.45rem 0.4rem', width: '150px' }}>Order & Details</th>
+                <th style={{ padding: '0.45rem 0.4rem', width: '150px' }}>Order &amp; Table</th>
+                <th style={{ padding: '0.45rem 0.4rem', width: '150px' }}>Source &amp; Contact</th>
                 <th style={{ padding: '0.45rem 0.4rem', width: '180px' }}>Dishes Breakdown</th>
                 <th style={{ padding: '0.45rem 0.4rem', width: '75px' }}>Amount</th>
                 <th style={{ padding: '0.45rem 0.4rem', width: '85px' }}>Payment Mode</th>
@@ -551,19 +571,144 @@ export const DashboardOverview = ({ setActivePanel }) => {
                       />
                     </td>
 
-                    {/* Order #, Date, Time & Table Number */}
-                    <td style={{ padding: '0.45rem 0.4rem', width: '150px' }}>
+                    {/* 1. Order #, Date, Time & Table Number */}
+                    <td style={{ padding: '0.45rem 0.4rem', width: '200px' }}>
                       <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--brand-primary)' }}>
                         #{ord.order_number}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px' }}>
                         📅 {getLocalDateString(ord.created_at)} • {formatTime(ord.created_at)}
                       </div>
-                      <div style={{ marginTop: '3px' }}>
-                        <span className="badge badge-dinein" style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.1rem 0.35rem' }}>
-                          Table #{ord.table_number}
-                        </span>
+
+                      {/* Table Badge & Inline Edit Popover */}
+                      <div style={{ marginTop: '4px', position: 'relative', display: 'inline-block' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          {ord.table_number === 'None' || ord.table_number === 'Takeaway' || !ord.table_number ? (
+                            <span className="badge badge-warning" style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.1rem 0.4rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+                              🛍️ TAKEAWAY
+                            </span>
+                          ) : (
+                            <span className="badge badge-dinein" style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.1rem 0.35rem' }}>
+                              Table #{ord.table_number}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTableOrderId(editingTableOrderId === ord.id ? null : ord.id);
+                              setCustomTableInput('');
+                            }}
+                            style={{
+                              background: 'none',
+                              border: '1px dashed var(--brand-primary)',
+                              color: 'var(--brand-primary)',
+                              borderRadius: '4px',
+                              fontSize: '0.64rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              padding: '0.08rem 0.35rem'
+                            }}
+                            title="Edit table number for this order"
+                          >
+                            ✏️ Edit Table
+                          </button>
+                        </div>
+
+                        {/* Theme-styled inline popover box (NO browser window.prompt) */}
+                        {editingTableOrderId === ord.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="glass-card animate-slide-up"
+                            style={{
+                              position: 'absolute',
+                              top: 'calc(100% + 4px)',
+                              left: 0,
+                              background: 'var(--bg-surface-elevated)',
+                              border: '1px solid var(--brand-primary)',
+                              borderRadius: '10px',
+                              boxShadow: '0 12px 35px rgba(0, 0, 0, 0.7)',
+                              zIndex: 99999,
+                              padding: '0.65rem',
+                              width: '220px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem' }}>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--brand-primary)' }}>
+                                Choose Table Number
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setEditingTableOrderId(null)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 800 }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.3rem', marginBottom: '0.5rem' }}>
+                              {['T-01', 'T-02', 'T-03', 'T-04', 'T-05', 'T-06', 'Takeaway'].map(tb => (
+                                <button
+                                  key={tb}
+                                  type="button"
+                                  onClick={() => handleSaveTableNumber(ord.id, tb)}
+                                  className={`btn btn-sm ${ord.table_number === tb ? 'btn-primary' : 'btn-secondary'}`}
+                                  style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.25rem 0.2rem', justifyContent: 'center' }}
+                                >
+                                  {tb}
+                                </button>
+                              ))}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.3rem' }}>
+                              <input
+                                type="text"
+                                placeholder="Custom T-#"
+                                value={customTableInput}
+                                onChange={(e) => setCustomTableInput(e.target.value)}
+                                className="input-field"
+                                style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', height: '28px', flex: 1 }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (customTableInput.trim()) handleSaveTableNumber(ord.id, customTableInput.trim());
+                                }}
+                                className="btn btn-primary btn-sm"
+                                style={{ fontSize: '0.68rem', padding: '0.2rem 0.5rem', fontWeight: 800 }}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    </td>
+
+                    {/* 2. DEDICATED SOURCE & CONTACT COLUMN */}
+                    <td style={{ padding: '0.45rem 0.4rem', width: '150px' }}>
+                      {ord.placed_by_name ? (
+                        <div>
+                          <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--brand-primary)' }}>
+                            👤 {ord.placed_by_name}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 700, marginTop: '2px' }}>
+                            {ord.order_source === 'self' || ord.placed_by_role === 'self'
+                              ? '└ Sale (Self)'
+                              : `└ Customer${ord.customer_phone ? `: ${ord.customer_phone}` : ''}`
+                            }
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                            👤 Customer
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>
+                            📞 {ord.customer_phone || 'No Phone'}
+                          </div>
+                        </div>
+                      )}
                     </td>
 
                     {/* Compact Dishes Breakdown Column with Truncated Dish Names */}
@@ -628,11 +773,6 @@ export const DashboardOverview = ({ setActivePanel }) => {
                     {/* Amount & Customer Phone */}
                     <td style={{ padding: '0.45rem 0.4rem', fontWeight: 800, color: 'var(--brand-primary)', whiteSpace: 'nowrap', width: '90px' }}>
                       <div>{formatCurrency(ord.net_amount)}</div>
-                      {ord.customer_phone && (
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          <span>📞</span> {ord.customer_phone}
-                        </div>
-                      )}
                     </td>
 
                     {/* Payment Mode (ONLY Mode written) */}
@@ -671,11 +811,6 @@ export const DashboardOverview = ({ setActivePanel }) => {
                         </div>
                       ) : (
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
-                            <span className="badge badge-nonveg" style={{ fontSize: '0.68rem', fontWeight: 800, padding: '0.15rem 0.4rem' }}>
-                              UNPAID
-                            </span>
-                          </div>
                           {/* Pay Now Button (Direct Pay in Cash) + Arrow Trigger (Opens Options) */}
                           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                             <button

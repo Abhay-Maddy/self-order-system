@@ -58,7 +58,7 @@ router.get('/analytics', verifyToken, requireRole(['admin', 'cashier']), async (
       const dyShort = targetDate.slice(8, 10);
       const orderPrefix = `%ORD-${yrShort}${moShort}${dyShort}%`;
 
-      const matchClause = "(SUBSTR(created_at, 1, 10) = ? OR created_at LIKE ? OR order_number LIKE ?)";
+      const matchClause = "(SUBSTR(created_at, 1, 10) = ? OR created_at LIKE ? OR order_number LIKE ? OR status IN ('active', 'pending', 'pending_verification'))";
       revQuery += ` WHERE ${matchClause}`;
       countQuery += ` WHERE ${matchClause}`;
       topQueryWhere = ` WHERE ${matchClause}`;

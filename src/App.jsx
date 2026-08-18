@@ -13,6 +13,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { SettingsProvider } from './context/SettingsContext';
 import { safeStorage, safeSessionStorage } from './utils/storage';
 import { Utensils, RefreshCw } from 'lucide-react';
 
@@ -70,9 +71,14 @@ class ErrorBoundary extends Component {
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem' }}>
             Aamantran Self-Ordering Platform
           </h2>
-          <p style={{ fontSize: '0.95rem', color: 'var(--text-muted, #94a3b8)', maxWidth: '440px', marginBottom: '1.75rem', lineHeight: '1.5' }}>
-            We are updating system data for a better experience! Please wait a few seconds and then click refresh.
+          <p style={{ fontSize: '0.95rem', color: 'var(--text-muted, #94a3b8)', maxWidth: '440px', marginBottom: '1rem', lineHeight: '1.5' }}>
+            We are updating system data for a better experience! Please click refresh below to load the latest version.
           </p>
+          {this.state.error && (
+            <div style={{ marginBottom: '1.5rem', padding: '0.5rem 1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', fontSize: '0.75rem', color: '#f87171', maxWidth: '500px', wordBreak: 'break-word' }}>
+              Details: {this.state.error.message || String(this.state.error)}
+            </div>
+          )}
           <button
             onClick={handleReset}
             className="btn btn-primary btn-lg"
@@ -83,7 +89,8 @@ class ErrorBoundary extends Component {
               fontWeight: 800,
               gap: '0.5rem',
               background: 'linear-gradient(135deg, var(--brand-primary, #f97316), #ea580c)',
-              boxShadow: '0 8px 25px rgba(249, 115, 22, 0.4)'
+              boxShadow: '0 8px 25px rgba(249, 115, 22, 0.4)',
+              cursor: 'pointer'
             }}
           >
             <RefreshCw size={18} />
@@ -143,6 +150,7 @@ function LoginRoute() {
 
 function AppContent() {
   const { user, loading } = useContext(AuthContext);
+  const { settings } = useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -406,7 +414,7 @@ function AppContent() {
         gap: '0.6rem',
         flexWrap: 'wrap'
       }}>
-        <span>Aamantran QR Self-Ordering Platform, Created by Abhay Maddy</span>
+        <span>{settings?.name || 'Aamantran'} QR Self-Ordering Platform {settings?.address ? `• ${settings.address}` : ''} {settings?.phone ? `• Ph: ${settings.phone}` : ''} {settings?.gstin ? `• GSTIN: ${settings.gstin}` : ''}</span>
         <a
           href="https://github.com/Abhay-Maddy"
           target="_blank"
@@ -451,7 +459,9 @@ export function App() {
         <LanguageProvider>
           <AuthProvider>
             <SocketProvider>
-              <AppContent />
+              <SettingsProvider>
+                <AppContent />
+              </SettingsProvider>
             </SocketProvider>
           </AuthProvider>
         </LanguageProvider>

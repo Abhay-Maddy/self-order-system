@@ -85,8 +85,9 @@ export const CheckoutModal = ({
       return;
     }
 
-    if (!customerPhone || !customerPhone.trim() || customerPhone.trim().length < 10) {
-      setErrorMessage('Mobile Phone Number is COMPULSORY (*)! Please enter a valid 10-digit mobile number before placing your order.');
+    const cleanPhone = (customerPhone || '').replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setErrorMessage('⚠ Customer Mobile Phone Number must be EXACTLY 10 digits (e.g. 9876543210).');
       return;
     }
 
@@ -100,13 +101,6 @@ export const CheckoutModal = ({
     setPaymentStatus('verifying');
 
     try {
-      // Simulate bank verification delay for online payment
-      if (paymentMode === 'online') {
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        setPaymentStatus('success');
-        await new Promise(resolve => setTimeout(resolve, 600));
-      }
-
       // Determine placed_by metadata based on user login state and orderFor
       let placedByName = '';
       let placedByRole = '';
@@ -119,7 +113,7 @@ export const CheckoutModal = ({
           placedByRole = 'self';
           orderSource = 'self';
         } else {
-          placedByRole = 'staff_for_customer';
+          placedByRole = user.role || 'staff';
           orderSource = 'customer';
         }
       } else {
@@ -129,12 +123,14 @@ export const CheckoutModal = ({
         orderSource = 'customer';
       }
 
+      const finalTable = (effectiveTable === 'None' || !effectiveTable || orderFor === 'self') ? 'Takeaway' : effectiveTable;
+
       const orderPayload = {
         table_number: finalTable,
         customer_phone: customerPhone || null,
-        payment_mode: paymentMode,
-        payment_status: paymentMode === 'online' ? 'completed' : 'pending',
-        utr_reference: upiIdInput || null,
+        payment_mode: 'cash',
+        payment_status: 'pending',
+        utr_reference: null,
         scheduled_time: scheduledTime,
         order_source: orderSource,
         placed_by_name: placedByName,
@@ -143,7 +139,6 @@ export const CheckoutModal = ({
         items: safeCart
       };
 
-      setIsCheckoutOpen && setIsCheckoutOpen(false);
       await onPlaceOrderSuccess(orderPayload);
       onClose();
     } catch (err) {
@@ -157,251 +152,84 @@ export const CheckoutModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Checkout & Payment${effectiveTable && effectiveTable !== 'None' ? ` — Table #${effectiveTable}` : ''}`}>
       <div>
-        {/* Guest Table Selector — only shown when not logged in and no QR param */}
-        {showTableSelector && (
+        {/* Takeaway Order vs Dine-In Table Banner */}
+        {effectiveTable === 'Takeaway' || effectiveTable === 'None' || !effectiveTable || orderFor === 'self' ? (
           <div style={{ marginBottom: '1.25rem', padding: '0.9rem', background: 'rgba(249,115,22,0.08)', border: '2px solid var(--brand-primary)', borderRadius: '12px' }}>
-            <label style={{ display: 'block', fontWeight: 800, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--brand-primary)' }}>
-              👥 Select Your Table Number
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: 'var(--brand-primary)', fontSize: '0.95rem' }}>
+              <span>🛍️</span>
+              <span>Takeaway Order (Self-Pickup)</span>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.3rem 0 0.6rem 0' }}>
+              Direct order without a table. Your order will be prepared for pickup at the counter.
+            </p>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+              ⏱️ Preferred Pickup / Prep Time:
             </label>
             <select
-              value={guestTable}
-              onChange={e => setGuestTable(e.target.value)}
+              value={scheduledTime}
+              onChange={(e) => setScheduledTime(e.target.value)}
               className="input-field"
-              style={{ fontWeight: 700 }}
+              style={{ fontWeight: 600, fontSize: '0.85rem' }}
             >
-              {(tables.length > 0 ? tables : [
-                { table_number: 'T-01' }, { table_number: 'T-02' }, { table_number: 'T-03' },
-                { table_number: 'T-04' }, { table_number: 'T-05' }, { table_number: 'T-06' }
-              ]).map((tb, i) => (
-                <option key={i} value={tb.table_number}>Table #{tb.table_number}</option>
-              ))}
+              <option value="ASAP (~15 mins)">⚡ ASAP (~15-20 mins)</option>
+              <option value="In 30 mins">⏳ In 30 mins</option>
+              <option value="In 45 mins">⏳ In 45 mins</option>
+              <option value="In 1 Hour">⏳ In 1 Hour</option>
             </select>
-            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              ℹ️ Choose the table number shown at your table
-            </div>
           </div>
+        ) : (
+          showTableSelector && (
+            <div style={{ marginBottom: '1.25rem', padding: '0.9rem', background: 'rgba(249,115,22,0.08)', border: '2px solid var(--brand-primary)', borderRadius: '12px' }}>
+              <label style={{ display: 'block', fontWeight: 800, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--brand-primary)' }}>
+                👥 Select Table Number
+              </label>
+              <select
+                value={guestTable}
+                onChange={e => setGuestTable(e.target.value)}
+                className="input-field"
+                style={{ fontWeight: 700 }}
+              >
+                {(tables.length > 0 ? tables : [
+                  { table_number: 'T-01' }, { table_number: 'T-02' }, { table_number: 'T-03' },
+                  { table_number: 'T-04' }, { table_number: 'T-05' }, { table_number: 'T-06' }
+                ]).map((tb, i) => (
+                  <option key={i} value={tb.table_number}>Table #{tb.table_number}</option>
+                ))}
+              </select>
+            </div>
+          )
         )}
-        {/* Mobile Number Input (Compulsory) */}
+
+        {/* Customer Phone Number Input */}
         <div style={{ marginBottom: '1.25rem' }}>
           <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.4rem', fontSize: '0.85rem' }}>
-            📱 Mobile Number <span style={{ color: 'var(--danger)', fontWeight: 800 }}>*</span> (Compulsory for SMS & Live Updates):
+            📱 Customer Phone Number <span style={{ color: 'var(--danger)' }}>* (Compulsory)</span>:
           </label>
           <div style={{ position: 'relative' }}>
             <Phone size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="tel"
-              required
               value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Enter 10-digit Mobile Number (e.g. 9876543210)"
+              onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              maxLength={10}
+              placeholder="Enter 10-digit Mobile Number (e.g. 9876543210) *"
               className="input-field"
               style={{ paddingLeft: '2.4rem', fontSize: '0.9rem', fontWeight: 600 }}
+              required
             />
           </div>
         </div>
 
-        {/* Primary Payment Mode Selection (Online vs Cash) */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.85rem' }}>
-            Choose Payment Method:
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.75rem' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setPaymentMode('online');
-                setErrorMessage('');
-              }}
-              style={{
-                padding: '0.85rem 0.75rem',
-                borderRadius: 'var(--border-radius-sm)',
-                border: `2px solid ${paymentMode === 'online' ? 'var(--brand-primary)' : 'var(--border-color)'}`,
-                background: paymentMode === 'online' ? 'rgba(249, 115, 22, 0.08)' : 'var(--bg-surface)',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: 'var(--brand-primary)', marginBottom: '0.2rem' }}>
-                <CreditCard size={18} />
-                <span>Online Payment</span>
-              </div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>UPI QR, GPay, PhonePe, Cards</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setPaymentMode('cash');
-                setErrorMessage('');
-              }}
-              style={{
-                padding: '0.85rem 0.75rem',
-                borderRadius: 'var(--border-radius-sm)',
-                border: `2px solid ${paymentMode === 'cash' ? 'var(--success)' : 'var(--border-color)'}`,
-                background: paymentMode === 'cash' ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-surface)',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: 'var(--success)', marginBottom: '0.2rem' }}>
-                <Banknote size={18} />
-                <span>Pay Cash</span>
-              </div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Pay at table or cash desk</span>
-            </button>
+        {/* Order Information Banner */}
+        <div style={{ padding: '0.85rem', background: 'rgba(249, 115, 22, 0.08)', border: '1px solid var(--brand-primary)', borderRadius: 'var(--border-radius-sm)', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: 'var(--brand-primary)', marginBottom: '0.3rem', fontSize: '0.88rem' }}>
+            <Banknote size={18} />
+            <span>Order Confirmation</span>
           </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+            Your order will be sent to the kitchen immediately upon confirmation. Payment can be made at the table / cash counter or via Admin UPI verification.
+          </p>
         </div>
-
-        {/* ONLINE PAYMENT INTERACTIVE SYSTEM (3 CLEAN OPTIONS: UPI QR, UPI APPS, CARDS) */}
-        {paymentMode === 'online' && (
-          <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.25rem', borderColor: 'var(--brand-primary)' }}>
-            {/* 3 Clean Sub-Tabs */}
-            <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr 1fr', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.55rem', marginBottom: '1rem' }}>
-              <button
-                type="button"
-                onClick={() => setOnlineOption('upi_qr')}
-                className={`btn btn-sm ${onlineOption === 'upi_qr' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ gap: '0.3rem', fontSize: '0.78rem', justifyContent: 'center' }}
-              >
-                <QrCode size={14} />
-                <span>1. UPI QR</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setOnlineOption('upi_apps')}
-                className={`btn btn-sm ${onlineOption === 'upi_apps' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ gap: '0.3rem', fontSize: '0.78rem', justifyContent: 'center' }}
-              >
-                <Smartphone size={14} />
-                <span>2. UPI Apps</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setOnlineOption('card')}
-                className={`btn btn-sm ${onlineOption === 'card' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ gap: '0.3rem', fontSize: '0.78rem', justifyContent: 'center' }}
-              >
-                <CreditCard size={14} />
-                <span>3. Cards</span>
-              </button>
-            </div>
-
-            {/* Option 1: UPI QR CODE WITH APP LOGO BUTTONS */}
-            {onlineOption === 'upi_qr' && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ display: 'inline-block', background: '#fff', padding: '0.6rem', borderRadius: '12px', boxShadow: 'var(--shadow-md)', marginBottom: '0.75rem' }}>
-                  {qrDataUrl ? (
-                    <img src={qrDataUrl} alt="UPI Payment QR Code" style={{ width: '160px', height: '160px', display: 'block' }} />
-                  ) : (
-                    <div style={{ width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                      Generating QR...
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ fontSize: '0.88rem', fontWeight: 800, marginBottom: '0.2rem' }}>
-                  Scan & Pay <span style={{ color: 'var(--brand-primary)' }}>{formatCurrency(grandTotal)}</span>
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                  Merchant UPI: <code>{merchantUpiId}</code>
-                </div>
-
-                {/* Direct App Launch Buttons under QR */}
-                <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    style={{ background: '#e0f2fe', color: '#0284c7', padding: '0.5rem', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                  >
-                    <span>Google Pay</span>
-                  </a>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    style={{ background: '#f3e8ff', color: '#7e22ce', padding: '0.5rem', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                  >
-                    <span>PhonePe</span>
-                  </a>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    style={{ background: '#e0e7ff', color: '#3730a3', padding: '0.5rem', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                  >
-                    <span>Paytm</span>
-                  </a>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    style={{ background: '#fef3c7', color: '#b45309', padding: '0.5rem', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                  >
-                    <span>BHIM Pay</span>
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* Option 2: UPI DIRECT APPS */}
-            {onlineOption === 'upi_apps' && (
-              <div>
-                <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                  Tap your app to launch & pay <strong style={{ color: 'var(--brand-primary)' }}>{formatCurrency(grandTotal)}</strong>:
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.6rem' }}>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    className="btn btn-secondary"
-                    style={{ background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
-                  >
-                    <span>Google Pay</span>
-                  </a>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    className="btn btn-secondary"
-                    style={{ background: '#f3e8ff', color: '#6b21a8', borderColor: '#e9d5ff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
-                  >
-                    <span>PhonePe</span>
-                  </a>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    className="btn btn-secondary"
-                    style={{ background: '#e0e7ff', color: '#3730a3', borderColor: '#c7d2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
-                  >
-                    <span>Paytm</span>
-                  </a>
-                  <a
-                    href={`upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Table%20${tableNumber}`}
-                    className="btn btn-secondary"
-                    style={{ background: '#fef3c7', color: '#92400e', borderColor: '#fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 700, padding: '0.65rem' }}
-                  >
-                    <span>BHIM UPI</span>
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* Option 3: CARDS */}
-            {onlineOption === 'card' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                <input type="text" placeholder="Card Number (4532 •••• •••• 8901)" className="input-field" style={{ fontSize: '0.85rem' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: isMobileSmall ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
-                  <input type="text" placeholder="MM / YY" className="input-field" style={{ fontSize: '0.85rem' }} />
-                  <input type="password" placeholder="CVV" className="input-field" style={{ fontSize: '0.85rem' }} />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* CASH PAYMENT INSTRUCTION BANNER */}
-        {paymentMode === 'cash' && (
-          <div style={{ padding: '0.9rem', background: 'var(--success-bg)', border: '1px dashed var(--success)', borderRadius: 'var(--border-radius-sm)', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: 'var(--success)', marginBottom: '0.3rem' }}>
-              <Banknote size={18} />
-              <span>Cash Payment at Table / Counter</span>
-            </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Your order will be sent to the kitchen immediately. You can pay cash to the server when food is served or at the cash desk.
-            </p>
-          </div>
-        )}
 
         {/* Error Feedback Alert */}
         {errorMessage && (
@@ -421,19 +249,17 @@ export const CheckoutModal = ({
           onClick={handleConfirmOrder}
           disabled={isSubmitting}
           className="btn btn-primary btn-lg"
-          style={{ width: '100%', gap: '0.5rem', background: paymentMode === 'cash' ? 'var(--success)' : 'var(--brand-primary)' }}
+          style={{ width: '100%', gap: '0.5rem', background: 'var(--brand-primary)', fontWeight: 800 }}
         >
           {isSubmitting ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sparkles size={18} className="animate-spin" />
-              <span>{paymentStatus === 'verifying' ? 'Verifying Online Payment...' : 'Processing Order...'}</span>
+              <span>Placing Order...</span>
             </div>
           ) : (
             <>
               <CheckCircle size={20} />
-              <span>
-                {paymentMode === 'online' ? `Pay & Confirm Order (${formatCurrency(grandTotal)})` : `Confirm Cash Order (${formatCurrency(grandTotal)})`}
-              </span>
+              <span>Confirm Order ({formatCurrency(grandTotal)})</span>
             </>
           )}
         </button>

@@ -45,7 +45,29 @@ export const CustomerPanel = ({ setActivePanel }) => {
   const [allItems, setAllItems] = useState([]);
   const [tables, setTables] = useState([]);
 
-  // --- Pending review state (for guest post-order review popup) ---
+  // Active Order & Modals State
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [isOrderTrackerOpen, setIsOrderTrackerOpen] = useState(false);
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isCustomerBillOpen, setIsCustomerBillOpen] = useState(false);
+  const [tamperAlert, setTamperAlert] = useState(false);
+
+  // Cart & Catalog State
+  const [rejectionToasts, setRejectionToasts] = useState([]);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeSubcat, setActiveSubcat] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [vegOnly, setVegOnly] = useState(false);
+
+  const [selectedItemForModal, setSelectedItemForModal] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  // Pending review state (for guest post-order review popup)
   const [pendingReviewData, setPendingReviewData] = useState(null);
   const [showPendingReview, setShowPendingReview] = useState(false);
 
@@ -72,7 +94,7 @@ export const CustomerPanel = ({ setActivePanel }) => {
     if (qParam) {
       return { mode: 'qr', table: qParam.toUpperCase() };
     }
-    return { mode: 'customer', table: 'T-01' };
+    return { mode: 'self', table: 'Takeaway' };
   };
 
   const initialParsed = getInitialModeAndTable();
@@ -200,14 +222,7 @@ export const CustomerPanel = ({ setActivePanel }) => {
   // Show "Who is Ordering?" modal when a user logs in (not for guests)
   // Reset when user changes or logs out
   useEffect(() => {
-    if (user && !hasTableParam && !sessionStorage.getItem('aamantran_order_mode_set')) {
-      setShowOrderSelectModal(true);
-    }
     if (!user) {
-      // When user logs out, clear the session flag so next login re-triggers modal
-      sessionStorage.removeItem('aamantran_order_mode_set');
-      setShowOrderSelectModal(false);
-
       // Check for pending review for guest users
       try {
         const rawPending = safeStorage.getItem('aamantran_pending_review');
@@ -380,17 +395,7 @@ export const CustomerPanel = ({ setActivePanel }) => {
     });
   };
 
-  // Helper: build the correct URL for "Continue to Menu" based on current path context
-  const buildMenuUrl = (table, pathContext) => {
-    const path = pathContext || location.pathname;
-    if (table === 'None' || !table) return path.startsWith('/') ? path.replace(/\/customer-menu.*/, '') : '/';
-    // Extract role/name from current path for staff contexts
-    const parts = path.split('/').filter(Boolean); // e.g. ['admin','john','customer-menu']
-    if (parts[0] === 'admin' && parts[1]) return `/admin/${parts[1]}/customer-menu/${table}`;
-    if (parts[0] === 'cashier' && parts[1]) return `/cashier/${parts[1]}/customer-menu/${table}`;
-    if (parts[0] === 'waiter' && parts[1]) return `/waiter/${parts[1]}/customer-menu/${table}`;
-    return `/menu/${table}`; // guest / generic
-  };
+
 
   const handlePlaceOrderSuccess = async (orderPayload) => {
     const formattedPayload = {
@@ -483,163 +488,7 @@ export const CustomerPanel = ({ setActivePanel }) => {
           ))}
         </div>
       )}
-      {/* "Who is Ordering?" Modal — shown once per session when no QR param */}
-      {showOrderSelectModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 99999,
-          background: 'rgba(0,0,0,0.72)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem'
-        }}>
-          <div className="glass-card animate-slide-up" style={{
-            width: '100%',
-            maxWidth: '420px',
-            padding: '2rem 1.5rem',
-            borderRadius: '20px',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
-            border: '1px solid var(--brand-primary)'
-          }}>
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)',
-                width: '56px', height: '56px', borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 1rem', color: '#fff',
-                boxShadow: '0 6px 20px rgba(249,115,22,0.4)'
-              }}>
-                <Users size={26} />
-              </div>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.35rem' }}>Who is Ordering?</h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Please select how you'd like to order</p>
-            </div>
 
-            {/* Self / Customer / QR Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <button
-                type="button"
-                onClick={() => { setModalOrderFor('self'); setModalTable('None'); }}
-                style={{
-                  padding: '0.85rem 0.3rem',
-                  borderRadius: '12px',
-                  border: `2px solid ${modalOrderFor === 'self' ? 'var(--brand-primary)' : 'var(--border-color)'}`,
-                  background: modalOrderFor === 'self' ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface-elevated)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem',
-                  transition: 'all 0.2s ease',
-                  fontWeight: 700
-                }}
-              >
-                <span style={{ fontSize: '1.4rem' }}>🙋</span>
-                <span style={{ fontSize: '0.82rem' }}>Self</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>Takeaway</span>
-                {modalOrderFor === 'self' && <CheckCircle size={14} color="var(--brand-primary)" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setModalOrderFor('customer'); if (modalTable === 'None') setModalTable('T-01'); }}
-                style={{
-                  padding: '0.85rem 0.3rem',
-                  borderRadius: '12px',
-                  border: `2px solid ${modalOrderFor === 'customer' ? 'var(--brand-primary)' : 'var(--border-color)'}`,
-                  background: modalOrderFor === 'customer' ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface-elevated)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem',
-                  transition: 'all 0.2s ease',
-                  fontWeight: 700
-                }}
-              >
-                <span style={{ fontSize: '1.4rem' }}>👥</span>
-                <span style={{ fontSize: '0.82rem' }}>Customer</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>Table Order</span>
-                {modalOrderFor === 'customer' && <CheckCircle size={14} color="var(--brand-primary)" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setModalOrderFor('qr'); if (modalTable === 'None') setModalTable('T-01'); }}
-                style={{
-                  padding: '0.85rem 0.3rem',
-                  borderRadius: '12px',
-                  border: `2px solid ${modalOrderFor === 'qr' ? 'var(--brand-primary)' : 'var(--border-color)'}`,
-                  background: modalOrderFor === 'qr' ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface-elevated)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem',
-                  transition: 'all 0.2s ease',
-                  fontWeight: 700
-                }}
-              >
-                <span style={{ fontSize: '1.4rem' }}>📱</span>
-                <span style={{ fontSize: '0.82rem' }}>QR Scan</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>QR Menu</span>
-                {modalOrderFor === 'qr' && <CheckCircle size={14} color="var(--brand-primary)" />}
-              </button>
-            </div>
-
-            {/* Table selector — shown when Customer or QR is chosen */}
-            {(modalOrderFor === 'customer' || modalOrderFor === 'qr') && (
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-                  Select Table Number
-                </label>
-                <select
-                  value={modalTable}
-                  onChange={e => setModalTable(e.target.value)}
-                  className="input-field"
-                  style={{ fontWeight: 700 }}
-                >
-                  {(tables.length > 0 ? tables : [
-                    { table_number: 'T-01' }, { table_number: 'T-02' }, { table_number: 'T-03' },
-                    { table_number: 'T-04' }, { table_number: 'T-05' }, { table_number: 'T-06' }
-                  ]).map((tb, i) => (
-                    <option key={i} value={tb.table_number}>Table #{tb.table_number}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* For Self — show None option info */}
-            {modalOrderFor === 'self' && (
-              <div style={{
-                marginBottom: '1.25rem',
-                padding: '0.75rem 1rem',
-                background: 'var(--bg-surface-elevated)',
-                borderRadius: '10px',
-                fontSize: '0.82rem',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border-color)'
-              }}>
-                ℹ️ Ordering without a table assignment (takeaway / self-pickup)
-              </div>
-            )}
-
-            {/* OK Button */}
-            <button
-              onClick={() => {
-                const newTable = modalOrderFor === 'self' ? 'None' : modalTable;
-                setOrderFor(modalOrderFor);
-                setSelectedTable(newTable);
-                sessionStorage.setItem('aamantran_order_mode_set', 'true');
-                setShowOrderSelectModal(false);
-                // Update URL to reflect the selected table & mode
-                const menuUrl = buildMenuUrl(newTable, modalOrderFor, location.pathname);
-                navigate(menuUrl, { replace: true });
-              }}
-              className="btn btn-primary btn-lg"
-              style={{ width: '100%', fontWeight: 800, borderRadius: '12px' }}
-            >
-              Continue to Menu →
-            </button>
-          </div>
-        </div>
-      )}
       {showSplash && (
         <AamantranSplash
           tableNumber={selectedTable}

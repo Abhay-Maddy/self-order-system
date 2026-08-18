@@ -211,14 +211,14 @@ export const initDb = async () => {
       order_number TEXT UNIQUE NOT NULL,
       table_number TEXT NOT NULL,
       customer_phone TEXT,
-      payment_mode TEXT CHECK(payment_mode IN ('online', 'cash')) NOT NULL,
-      payment_status TEXT CHECK(payment_status IN ('pending', 'completed', 'failed', 'refunded')) DEFAULT 'pending',
+      payment_mode TEXT NOT NULL DEFAULT 'cash',
+      payment_status TEXT DEFAULT 'pending',
       total_amount REAL NOT NULL,
       tax_amount REAL NOT NULL,
       discount_amount REAL DEFAULT 0,
       net_amount REAL NOT NULL,
       status TEXT DEFAULT 'active',
-      order_source TEXT CHECK(order_source IN ('customer', 'waiter')) DEFAULT 'customer',
+      order_source TEXT DEFAULT 'customer',
       scheduled_time TEXT DEFAULT 'ASAP (~15 mins)',
       refund_reason TEXT,
       utr_reference TEXT,
@@ -282,8 +282,8 @@ export const initDb = async () => {
       quantity INTEGER NOT NULL,
       unit_price REAL NOT NULL,
       total_price REAL NOT NULL,
-      fulfillment_type TEXT CHECK(fulfillment_type IN ('dine_in', 'packing')) NOT NULL DEFAULT 'dine_in',
-      status TEXT CHECK(status IN ('pending', 'accepted', 'preparing', 'ready', 'served', 'rejected')) DEFAULT 'pending',
+      fulfillment_type TEXT NOT NULL DEFAULT 'dine_in',
+      status TEXT DEFAULT 'pending',
       rejection_reason TEXT,
       prep_time_minutes INTEGER DEFAULT 15,
       estimated_ready_at DATETIME,
@@ -298,6 +298,96 @@ export const initDb = async () => {
   try {
     await runQuery(`ALTER TABLE order_items ADD COLUMN estimated_ready_at DATETIME`);
   } catch (e) {}
+
+  // Migrate existing tables to remove restrictive CHECK constraints if present
+  try {
+    const tableSql = await getQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'");
+    if (tableSql && tableSql.sql && (tableSql.sql.includes('CHECK(payment_mode IN') || tableSql.sql.includes('CHECK(order_source IN'))) {
+      console.log('Migrating orders table schema to remove restrictive CHECK constraints...');
+      await runQuery('PRAGMA foreign_keys=OFF');
+      await runQuery('CREATE TABLE orders_backup AS SELECT * FROM orders');
+      await runQuery('DROP TABLE orders');
+      await runQuery(`
+        CREATE TABLE orders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          order_number TEXT UNIQUE NOT NULL,
+          table_number TEXT NOT NULL,
+          customer_phone TEXT,
+          payment_mode TEXT NOT NULL DEFAULT 'cash',
+          payment_status TEXT DEFAULT 'pending',
+          total_amount REAL NOT NULL,
+          tax_amount REAL NOT NULL,
+          discount_amount REAL DEFAULT 0,
+          net_amount REAL NOT NULL,
+          status TEXT DEFAULT 'active',
+          order_source TEXT DEFAULT 'customer',
+          scheduled_time TEXT DEFAULT 'ASAP (~15 mins)',
+          refund_reason TEXT,
+          utr_reference TEXT,
+          prep_time_minutes INTEGER DEFAULT 15,
+          estimated_ready_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          placed_by_name TEXT DEFAULT '',
+          placed_by_role TEXT DEFAULT '',
+          refunded_amount REAL DEFAULT 0,
+          cash_paid REAL DEFAULT 0,
+          online_paid REAL DEFAULT 0,
+          refund_cash_amount REAL DEFAULT 0,
+          refund_online_amount REAL DEFAULT 0,
+          refund_mode TEXT DEFAULT 'cash'
+        )
+      `);
+      await runQuery(`
+        INSERT INTO orders (id, order_number, table_number, customer_phone, payment_mode, payment_status, total_amount, tax_amount, discount_amount, net_amount, status, order_source, scheduled_time, refund_reason, utr_reference, prep_time_minutes, estimated_ready_at, created_at, placed_by_name, placed_by_role, refunded_amount, cash_paid, online_paid, refund_cash_amount, refund_online_amount, refund_mode)
+        SELECT id, order_number, table_number, customer_phone, payment_mode, payment_status, total_amount, tax_amount, discount_amount, net_amount, status, order_source, scheduled_time, refund_reason, utr_reference, prep_time_minutes, estimated_ready_at, created_at, placed_by_name, placed_by_role, refunded_amount, cash_paid, online_paid, refund_cash_amount, refund_online_amount, refund_mode FROM orders_backup
+      `);
+      await runQuery('DROP TABLE orders_backup');
+      await runQuery('PRAGMA foreign_keys=ON');
+      console.log('✅ Orders table schema successfully migrated!');
+    }
+  } catch (e) {
+    console.error('Orders table migration note:', e.message);
+  }
+
+  try {
+    const itemSql = await getQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='order_items'");
+    if (itemSql && itemSql.sql && (itemSql.sql.includes('CHECK(status IN') || itemSql.sql.includes('CHECK(fulfillment_type IN'))) {
+      console.log('Migrating order_items table schema to remove restrictive CHECK constraints...');
+      await runQuery('PRAGMA foreign_keys=OFF');
+      await runQuery('CREATE TABLE order_items_backup AS SELECT * FROM order_items');
+      await runQuery('DROP TABLE order_items');
+      await runQuery(`
+        CREATE TABLE order_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          order_id INTEGER NOT NULL,
+          item_id INTEGER NOT NULL,
+          item_name TEXT NOT NULL,
+          variant_name TEXT,
+          toppings_summary TEXT,
+          spice_level TEXT,
+          quantity INTEGER NOT NULL,
+          unit_price REAL NOT NULL,
+          total_price REAL NOT NULL,
+          fulfillment_type TEXT NOT NULL DEFAULT 'dine_in',
+          status TEXT DEFAULT 'pending',
+          rejection_reason TEXT,
+          prep_time_minutes INTEGER DEFAULT 15,
+          estimated_ready_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+        )
+      `);
+      await runQuery(`
+        INSERT INTO order_items (id, order_id, item_id, item_name, variant_name, toppings_summary, spice_level, quantity, unit_price, total_price, fulfillment_type, status, rejection_reason, prep_time_minutes, estimated_ready_at, created_at)
+        SELECT id, order_id, item_id, item_name, variant_name, toppings_summary, spice_level, quantity, unit_price, total_price, fulfillment_type, status, rejection_reason, prep_time_minutes, estimated_ready_at, created_at FROM order_items_backup
+      `);
+      await runQuery('DROP TABLE order_items_backup');
+      await runQuery('PRAGMA foreign_keys=ON');
+      console.log('✅ Order_items table schema successfully migrated!');
+    }
+  } catch (e) {
+    console.error('Order_items table migration note:', e.message);
+  }
 
   await runQuery(`
     CREATE TABLE IF NOT EXISTS reviews (

@@ -1,17 +1,25 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { Modal } from '../Common/Modal';
 import { LanguageContext } from '../../context/LanguageContext';
+import { SettingsContext } from '../../context/SettingsContext';
 import { fetchAPI } from '../../utils/api';
 import confetti from 'canvas-confetti';
 import { Star, MapPin, Send, Utensils } from 'lucide-react';
 
 export const GoogleReviewModal = ({ isOpen, onClose, onSkip, orderId, order, googleReviewUrl }) => {
   const { t } = useContext(LanguageContext);
+  const { settings } = useContext(SettingsContext) || {};
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [itemRatings, setItemRatings] = useState({}); // { [item_name]: { rating: 5, comment: '' } }
   const [submitted, setSubmitted] = useState(false);
-  const [gUrl, setGUrl] = useState(googleReviewUrl || 'https://maps.google.com/?q=Aamantran+Bistro');
+  const [gUrl, setGUrl] = useState(googleReviewUrl || settings?.google_maps_review_url || 'https://maps.google.com/?q=Aamantran+Bistro');
+
+  useEffect(() => {
+    if (settings?.google_maps_review_url) {
+      setGUrl(googleReviewUrl || settings.google_maps_review_url);
+    }
+  }, [settings, googleReviewUrl]);
 
   const orderItems = order?.items || [];
 

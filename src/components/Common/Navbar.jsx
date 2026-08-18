@@ -9,9 +9,12 @@ import { LanguageContext } from '../../context/LanguageContext';
 import { getPanelPath } from '../../utils/panelPath';
 import { Utensils, LogOut, Settings, Lock } from 'lucide-react';
 
+import { SettingsContext } from '../../context/SettingsContext';
+
 export const Navbar = ({ setActivePanel }) => {
   const { user, logout } = useContext(AuthContext);
   const { t } = useContext(LanguageContext);
+  const { settings } = useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -55,7 +58,7 @@ export const Navbar = ({ setActivePanel }) => {
             <Utensils size={22} />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.25rem', lineHeight: '1.1' }}>Aamantran</h2>
+            <h2 style={{ fontSize: '1.25rem', lineHeight: '1.1' }}>{settings?.name || 'Aamantran'}</h2>
             <span className="navbar-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>Self-Ordering Platform</span>
           </div>
         </div>

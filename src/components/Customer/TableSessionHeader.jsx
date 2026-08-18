@@ -38,6 +38,11 @@ export const TableSessionHeader = ({
   ];
   const tableList = tables && tables.length > 0 ? tables : defaultTables;
 
+  // Only Admin and Cashier are allowed to edit table numbers. Waiter, Chef, and Customer have fixed table numbers.
+  const canEditTable = user && (user.role === 'admin' || user.role === 'cashier' || user.username === 'admin' || user.username === 'cashier1');
+
+  const displayTable = (selectedTable && selectedTable !== 'None' && selectedTable !== 'Takeaway') ? selectedTable : 'T-01';
+
   return (
     <div className="glass-card" style={{ padding: '0.85rem 1rem', marginBottom: '1.25rem', position: 'relative', zIndex: 50 }}>
       {/* Top Header Bar */}
@@ -46,8 +51,7 @@ export const TableSessionHeader = ({
         {/* Interactive Mode & Table Badge Chip */}
         <div
           onClick={() => {
-            if (onOpenOrderSelectModal) onOpenOrderSelectModal();
-            else if (user) setIsTableSelectorOpen(!isTableSelectorOpen);
+            if (canEditTable) setIsTableSelectorOpen(!isTableSelectorOpen);
           }}
           style={{
             background: 'linear-gradient(135deg, var(--brand-primary), #ea580c)',
@@ -61,27 +65,13 @@ export const TableSessionHeader = ({
             fontSize: '0.85rem',
             boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)',
             whiteSpace: 'nowrap',
-            cursor: (user || onOpenOrderSelectModal) ? 'pointer' : 'default'
+            cursor: canEditTable ? 'pointer' : 'default'
           }}
-          title={user ? "Click to change Order Mode or Table Number" : `Ordering Mode: ${orderFor}`}
+          title={canEditTable ? "Click to switch Table Number" : `Table #${displayTable}`}
         >
-          {orderFor === 'self' || selectedTable === 'None' ? (
-            <>
-              <span>🙋</span>
-              <span>Self Menu</span>
-            </>
-          ) : orderFor === 'qr' ? (
-            <>
-              <QrCode size={16} />
-              <span>QR Table #{selectedTable}</span>
-            </>
-          ) : (
-            <>
-              <QrCode size={16} />
-              <span>Table #{selectedTable}</span>
-            </>
-          )}
-          {user && <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>⚙️</span>}
+          <QrCode size={16} />
+          <span>Table #{displayTable}</span>
+          {canEditTable && <span style={{ fontSize: '0.75rem', opacity: 0.9, marginLeft: '2px' }}>✏️</span>}
         </div>
 
         {/* Back to Dashboard Button — role-aware */}
